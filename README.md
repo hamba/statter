@@ -1,4 +1,4 @@
-![Logo](http://svg.wiersma.co.za/github/project?lang=go&title=statter&tag=Go%20stats%20clients)
+![Logo](http://svg.wiersma.co.za/hamba/project?title=statter&tag=Go%20stats%20clients)
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/hamba/statter)](https://goreportcard.com/report/github.com/hamba/statter)
 [![Build Status](https://travis-ci.com/hamba/statter.svg?branch=master)](https://travis-ci.com/hamba/statter)
