@@ -1,5 +1,6 @@
 package tags
 
+// Normalize normalises tags.
 func Normalize(tags []interface{}) []interface{} {
 	// tags need to be even as they are key/value pairs
 	if len(tags)%2 != 0 {
@@ -9,6 +10,7 @@ func Normalize(tags []interface{}) []interface{} {
 	return tags
 }
 
+// Deduplicate deduplicates tags.
 func Deduplicate(tags []interface{}) []interface{} {
 	for i := 0; i < len(tags); i += 2 {
 		for j := i + 2; j < len(tags); j += 2 {
