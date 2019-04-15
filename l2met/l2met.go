@@ -71,7 +71,7 @@ func New(l Logger, prefix string, opts ...OptsFunc) *L2met {
 }
 
 // Inc increments a count by the value.
-func (s *L2met) Inc(name string, value int64, rate float32, tags ...interface{}) {
+func (s *L2met) Inc(name string, value int64, rate float32, tags ...string) {
 	s.render(
 		"count",
 		name,
@@ -82,7 +82,7 @@ func (s *L2met) Inc(name string, value int64, rate float32, tags ...interface{})
 }
 
 // Gauge measures the value of a metric.
-func (s *L2met) Gauge(name string, value float64, rate float32, tags ...interface{}) {
+func (s *L2met) Gauge(name string, value float64, rate float32, tags ...string) {
 	s.render(
 		"sample",
 		name,
@@ -93,7 +93,7 @@ func (s *L2met) Gauge(name string, value float64, rate float32, tags ...interfac
 }
 
 // Timing sends the value of a Duration.
-func (s *L2met) Timing(name string, value time.Duration, rate float32, tags ...interface{}) {
+func (s *L2met) Timing(name string, value time.Duration, rate float32, tags ...string) {
 	s.render(
 		"measure",
 		name,
@@ -104,7 +104,7 @@ func (s *L2met) Timing(name string, value time.Duration, rate float32, tags ...i
 }
 
 // render outputs the metric to the logger
-func (s *L2met) render(measure, name string, value interface{}, rate float32, t []interface{}) {
+func (s *L2met) render(measure, name string, value interface{}, rate float32, t []string) {
 	if !s.includeStat(rate) {
 		return
 	}
@@ -114,7 +114,9 @@ func (s *L2met) render(measure, name string, value interface{}, rate float32, t 
 	ctx := make([]interface{}, len(t)+2)
 	ctx[0] = measure + "#" + s.prefix + name + s.formatRate(rate)
 	ctx[1] = value
-	copy(ctx[2:], t)
+	for i, val := range t {
+		ctx[i+2] = val
+	}
 
 	s.log.Info("", ctx...)
 }

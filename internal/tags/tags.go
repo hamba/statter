@@ -1,17 +1,17 @@
 package tags
 
 // Normalize normalises tags.
-func Normalize(tags []interface{}) []interface{} {
+func Normalize(tags []string) []string {
 	// tags need to be even as they are key/value pairs
 	if len(tags)%2 != 0 {
-		tags = append(tags, nil, "STATTER_ERROR", "Normalised odd number of tags by adding nil")
+		tags = append(tags, "nil", "STATTER_ERROR", "Normalised odd number of tags by adding nil")
 	}
 
 	return tags
 }
 
 // Deduplicate deduplicates tags.
-func Deduplicate(tags []interface{}) []interface{} {
+func Deduplicate(tags []string) []string {
 	for i := 0; i < len(tags); i += 2 {
 		for j := i + 2; j < len(tags); j += 2 {
 			if tags[i] == tags[j] {

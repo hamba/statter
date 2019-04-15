@@ -136,39 +136,23 @@ func TestBuffered_Timing(t *testing.T) {
 }
 
 func TestFormatTags(t *testing.T) {
-	tags := []interface{}{
-		"bool", true,
-		"float32", float32(1.23),
-		"float64", float64(1.23),
-		"int", 1,
-		"int8", int8(2),
-		"int16", int16(2),
-		"int32", int32(2),
-		"int64", int64(2),
-		"uint", uint(1),
-		"uint8", uint8(2),
-		"uint16", uint16(2),
-		"uint32", uint32(2),
-		"uint64", uint64(2),
+	tags := []string{
 		"test", "test",
 		"foo", "bar",
 		"test", "baz",
-		"struct", struct {
-			Name string
-		}{Name: "blah"},
 	}
 
 	assert.Equal(t, "", formatTags(nil))
-	assert.Equal(t, "", formatTags([]interface{}{}))
+	assert.Equal(t, "", formatTags([]string{}))
 
 	got := formatTags(tags)
 
-	expect := ",bool=true,float32=1.2300000190734863,float64=1.23,int=1,int8=2,int16=2,int32=2,int64=2,uint=1,uint8=2,uint16=2,uint32=2,uint64=2,test=baz,foo=bar,struct={Name:blah}"
+	expect := ",test=baz,foo=bar"
 	assert.Equal(t, expect, got)
 }
 
 func TestFormatTags_Uneven(t *testing.T) {
-	tags := []interface{}{
+	tags := []string{
 		"test", "test",
 		"foo",
 	}
@@ -179,14 +163,15 @@ func TestFormatTags_Uneven(t *testing.T) {
 }
 
 func BenchmarkFormatTags(b *testing.B) {
-	tags := []interface{}{
-		"string", "test",
-		"float", 1.2,
-		"int", 1,
-		"bool", true,
+	tags := []string{
+		"string1", "test1",
+		"string2", "test2",
+		"string3", "test3",
+		"string4", "test4",
 	}
 
 	b.ReportAllocs()
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		formatTags(tags)
 	}

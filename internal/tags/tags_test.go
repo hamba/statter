@@ -10,18 +10,18 @@ import (
 func TestNormalize(t *testing.T) {
 	tests := []struct {
 		name string
-		tags []interface{}
-		want []interface{}
+		tags []string
+		want []string
 	}{
 		{
 			name: "Valid",
-			tags: []interface{}{"test1", "foo"},
-			want: []interface{}{"test1", "foo"},
+			tags: []string{"test1", "foo"},
+			want: []string{"test1", "foo"},
 		},
 		{
 			name: "Unpaired",
-			tags: []interface{}{"test1"},
-			want: []interface{}{"test1", nil, "STATTER_ERROR", "Normalised odd number of tags by adding nil"},
+			tags: []string{"test1"},
+			want: []string{"test1", "nil", "STATTER_ERROR", "Normalised odd number of tags by adding nil"},
 		},
 	}
 
@@ -35,23 +35,23 @@ func TestNormalize(t *testing.T) {
 func TestDeduplicate(t *testing.T) {
 	tests := []struct {
 		name string
-		tags []interface{}
-		want []interface{}
+		tags []string
+		want []string
 	}{
 		{
 			name: "Duplicates",
-			tags: []interface{}{"test1", "foo", "test1", "bar"},
-			want: []interface{}{"test1", "bar"},
+			tags: []string{"test1", "foo", "test1", "bar"},
+			want: []string{"test1", "bar"},
 		},
 		{
 			name: "No Duplicates",
-			tags: []interface{}{"test1", "foo", "test2", "bar"},
-			want: []interface{}{"test1", "foo", "test2", "bar"},
+			tags: []string{"test1", "foo", "test2", "bar"},
+			want: []string{"test1", "foo", "test2", "bar"},
 		},
 		{
 			name: "Duplicate Ordering",
-			tags: []interface{}{"test1", "foo", "test2", "bar", "test1", "baz"},
-			want: []interface{}{"test1", "baz", "test2", "bar"},
+			tags: []string{"test1", "foo", "test2", "bar", "test1", "baz"},
+			want: []string{"test1", "baz", "test2", "bar"},
 		},
 	}
 
@@ -63,7 +63,7 @@ func TestDeduplicate(t *testing.T) {
 }
 
 func BenchmarkTaggedStats_DeduplicateTags(b *testing.B) {
-	t := []interface{}{
+	t := []string{
 		"test1", "foo",
 		"test2", "bar",
 		"test1", "baz",
