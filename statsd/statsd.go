@@ -2,7 +2,6 @@
 package statsd
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/cactus/go-statsd-client/statsd"
@@ -28,19 +27,19 @@ func New(addr, prefix string) (*Statsd, error) {
 }
 
 // Inc increments a count by the value.
-func (s *Statsd) Inc(name string, value int64, rate float32, tags ...interface{}) {
+func (s *Statsd) Inc(name string, value int64, rate float32, tags ...string) {
 	name += formatTags(tags)
 	_ = s.client.Inc(name, value, rate)
 }
 
 // Gauge measures the value of a metric.
-func (s *Statsd) Gauge(name string, value float64, rate float32, tags ...interface{}) {
+func (s *Statsd) Gauge(name string, value float64, rate float32, tags ...string) {
 	name += formatTags(tags)
 	_ = s.client.Gauge(name, int64(value), rate)
 }
 
 // Timing sends the value of a Duration.
-func (s *Statsd) Timing(name string, value time.Duration, rate float32, tags ...interface{}) {
+func (s *Statsd) Timing(name string, value time.Duration, rate float32, tags ...string) {
 	name += formatTags(tags)
 	_ = s.client.TimingDuration(name, value, rate)
 }
@@ -95,19 +94,19 @@ func NewBuffered(addr, prefix string, opts ...BufferedStatsdFunc) (*BufferedStat
 }
 
 // Inc increments a count by the value.
-func (s *BufferedStatsd) Inc(name string, value int64, rate float32, tags ...interface{}) {
+func (s *BufferedStatsd) Inc(name string, value int64, rate float32, tags ...string) {
 	name += formatTags(tags)
 	_ = s.client.Inc(name, value, rate)
 }
 
 // Gauge measures the value of a metric.
-func (s *BufferedStatsd) Gauge(name string, value float64, rate float32, tags ...interface{}) {
+func (s *BufferedStatsd) Gauge(name string, value float64, rate float32, tags ...string) {
 	name += formatTags(tags)
 	_ = s.client.Gauge(name, int64(value), rate)
 }
 
 // Timing sends the value of a Duration.
-func (s *BufferedStatsd) Timing(name string, value time.Duration, rate float32, tags ...interface{}) {
+func (s *BufferedStatsd) Timing(name string, value time.Duration, rate float32, tags ...string) {
 	name += formatTags(tags)
 	_ = s.client.TimingDuration(name, value, rate)
 }
@@ -120,7 +119,7 @@ func (s *BufferedStatsd) Close() error {
 var pool = bytes.NewPool(512)
 
 // formatTags formats into an InfluxDB style string
-func formatTags(t []interface{}) string {
+func formatTags(t []string) string {
 	if len(t) == 0 {
 		return ""
 	}
@@ -130,53 +129,12 @@ func formatTags(t []interface{}) string {
 	buf := pool.Get()
 	for i := 0; i < len(t); i += 2 {
 		buf.WriteByte(',')
-		formatValue(buf, t[i])
+		buf.WriteString(t[i])
 		buf.WriteByte('=')
-		formatValue(buf, t[i+1])
+		buf.WriteString(t[i+1])
 	}
 
 	s := string(buf.Bytes())
 	pool.Put(buf)
 	return s
-}
-
-// formatValue formats a value, adding it to the Buffer.
-func formatValue(buf *bytes.Buffer, value interface{}) {
-	if value == nil {
-		buf.WriteString("nil")
-		return
-	}
-
-	switch v := value.(type) {
-	case bool:
-		buf.AppendBool(v)
-	case float32:
-		buf.AppendFloat(float64(v), 'g', -1, 64)
-	case float64:
-		buf.AppendFloat(v, 'g', -1, 64)
-	case int:
-		buf.AppendInt(int64(v))
-	case int8:
-		buf.AppendInt(int64(v))
-	case int16:
-		buf.AppendInt(int64(v))
-	case int32:
-		buf.AppendInt(int64(v))
-	case int64:
-		buf.AppendInt(v)
-	case uint:
-		buf.AppendUint(uint64(v))
-	case uint8:
-		buf.AppendUint(uint64(v))
-	case uint16:
-		buf.AppendUint(uint64(v))
-	case uint32:
-		buf.AppendUint(uint64(v))
-	case uint64:
-		buf.AppendUint(v)
-	case string:
-		buf.WriteString(v)
-	default:
-		buf.WriteString(fmt.Sprintf("%+v", value))
-	}
 }
