@@ -42,7 +42,7 @@ func UseSampler(sampler SamplerFunc) OptsFunc {
 	}
 }
 
-// L2met represents a l2met client.
+// L2met is a l2met client.
 type L2met struct {
 	log    Logger
 	prefix string
@@ -51,7 +51,7 @@ type L2met struct {
 	sampler  SamplerFunc
 }
 
-// New create a l2met instance.
+// New returns a l2met instance.
 func New(l Logger, prefix string, opts ...OptsFunc) *L2met {
 	if len(prefix) > 0 {
 		prefix += "."

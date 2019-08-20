@@ -9,12 +9,12 @@ import (
 	"github.com/hamba/statter/internal/tags"
 )
 
-// Statsd represents a statsd client.
+// Statsd is a statsd client.
 type Statsd struct {
 	client statsd.Statter
 }
 
-// New create a Statsd instance.
+// New returns a statsd instance.
 func New(addr, prefix string) (*Statsd, error) {
 	c, err := statsd.NewClient(addr, prefix)
 	if err != nil {
