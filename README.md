@@ -20,3 +20,4 @@ go get github.com/hamba/statter
 #### Supported stats clients
 * **L2met** Writes l2met to a `Logger` interface
 * **Statsd** Writes statsd to `UDP`
+* **Prometheus** Exposes stats via `HTTP`
