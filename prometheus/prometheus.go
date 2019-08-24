@@ -1,7 +1,6 @@
 package prometheus
 
 import (
-	"errors"
 	"net/http"
 	"sort"
 	"strings"
@@ -11,6 +10,11 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
+
+// Logger represents an abstract logging object.
+type Logger interface {
+	Error(msg string, ctx ...interface{})
+}
 
 // FQN is a name formatter.
 type FQN struct {
@@ -32,6 +36,7 @@ func (f *FQN) Format(name string) string {
 // Prometheus is a prometheus stats collector.
 type Prometheus struct {
 	prefix string
+	log    Logger
 
 	fqn *FQN
 
@@ -42,11 +47,12 @@ type Prometheus struct {
 }
 
 // New returns a new prometheus stats instance.
-func New(prefix string) *Prometheus {
+func New(prefix string, log Logger) *Prometheus {
 	fqn := NewFQN()
 
 	return &Prometheus{
 		prefix:   fqn.Format(prefix),
+		log:      log,
 		fqn:      fqn,
 		reg:      prometheus.NewRegistry(),
 		counters: map[string]*prometheus.CounterVec{},
@@ -61,7 +67,7 @@ func (s *Prometheus) Handler() http.Handler {
 }
 
 // Inc increments a count by the value.
-func (s *Prometheus) Inc(name string, value int64, rate float32, tags ...string) error {
+func (s *Prometheus) Inc(name string, value int64, rate float32, tags ...string) {
 	lblNames, lbls := formatTags(tags)
 
 	key := createKey(name, lblNames)
@@ -77,23 +83,22 @@ func (s *Prometheus) Inc(name string, value int64, rate float32, tags ...string)
 		)
 
 		if err := s.reg.Register(m); err != nil {
-			return err
+			s.log.Error("prometheus: error registering metric", "error", err)
+			return
 		}
 		s.counters[key] = m
 	}
 
 	m.With(lbls).Add(float64(value))
-
-	return nil
 }
 
 // Dec decrements a count by the value.
-func (s *Prometheus) Dec(name string, value int64, rate float32, tags ...string) error {
-	return errors.New("prometheus: decrement not supported")
+func (s *Prometheus) Dec(name string, value int64, rate float32, tags ...string) {
+	s.log.Error("prometheus: decrement not supported")
 }
 
 // Gauge measures the value of a metric.
-func (s *Prometheus) Gauge(name string, value float64, rate float32, tags ...string) error {
+func (s *Prometheus) Gauge(name string, value float64, rate float32, tags ...string) {
 	lblNames, lbls := formatTags(tags)
 
 	key := createKey(name, lblNames)
@@ -109,18 +114,17 @@ func (s *Prometheus) Gauge(name string, value float64, rate float32, tags ...str
 		)
 
 		if err := s.reg.Register(m); err != nil {
-			return err
+			s.log.Error("prometheus: error registering metric", "error", err)
+			return
 		}
 		s.gauges[key] = m
 	}
 
 	m.With(lbls).Set(value)
-
-	return nil
 }
 
 // Timing sends the value of a Duration.
-func (s *Prometheus) Timing(name string, value time.Duration, rate float32, tags ...string) error {
+func (s *Prometheus) Timing(name string, value time.Duration, rate float32, tags ...string) {
 	lblNames, lbls := formatTags(tags)
 
 	key := createKey(name, lblNames)
@@ -137,14 +141,13 @@ func (s *Prometheus) Timing(name string, value time.Duration, rate float32, tags
 		)
 
 		if err := s.reg.Register(m); err != nil {
-			return err
+			s.log.Error("prometheus: error registering metric", "error", err)
+			return
 		}
 		s.timings[key] = m
 	}
 
 	m.With(lbls).Observe(float64(value) / float64(time.Millisecond))
-
-	return nil
 }
 
 // Close closes the client and flushes buffered stats, if applicable
