@@ -77,6 +77,20 @@ func TestPrometheus_Timing(t *testing.T) {
 	assert.Contains(t, rr.Body.String(), "test_test_test_count{test=\"test\"} 1")
 }
 
+func TestPrometheus_ConvertsLabels(t *testing.T) {
+	l := &testLogger{}
+	s := prometheus.New("test.test", l)
+
+	s.Inc("test", 2, 1.0, "test-label", "test")
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/metrics", nil)
+	s.Handler().ServeHTTP(rr, req)
+
+	assert.Equal(t, "msg=", l.Render())
+	assert.Contains(t, rr.Body.String(), "test_test_test{test_label=\"test\"} 2")
+}
+
 func TestPrometheus_Close(t *testing.T) {
 	l := &testLogger{}
 	s := prometheus.New("test.test", l)

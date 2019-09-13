@@ -68,7 +68,7 @@ func (s *Prometheus) Handler() http.Handler {
 
 // Inc increments a count by the value.
 func (s *Prometheus) Inc(name string, value int64, rate float32, tags ...string) {
-	lblNames, lbls := formatTags(tags)
+	lblNames, lbls := formatTags(tags, s.fqn)
 
 	key := createKey(name, lblNames)
 	m, ok := s.counters[key]
@@ -99,7 +99,7 @@ func (s *Prometheus) Dec(name string, value int64, rate float32, tags ...string)
 
 // Gauge measures the value of a metric.
 func (s *Prometheus) Gauge(name string, value float64, rate float32, tags ...string) {
-	lblNames, lbls := formatTags(tags)
+	lblNames, lbls := formatTags(tags, s.fqn)
 
 	key := createKey(name, lblNames)
 	m, ok := s.gauges[key]
@@ -125,7 +125,7 @@ func (s *Prometheus) Gauge(name string, value float64, rate float32, tags ...str
 
 // Timing sends the value of a Duration.
 func (s *Prometheus) Timing(name string, value time.Duration, rate float32, tags ...string) {
-	lblNames, lbls := formatTags(tags)
+	lblNames, lbls := formatTags(tags, s.fqn)
 
 	key := createKey(name, lblNames)
 	m, ok := s.timings[key]
@@ -161,13 +161,13 @@ func createKey(name string, lblNames []string) string {
 }
 
 // formatTags create a prometheus Label map from tags.
-func formatTags(t []string) ([]string, prometheus.Labels) {
+func formatTags(t []string, fqn *FQN) ([]string, prometheus.Labels) {
 	t = tags.Deduplicate(tags.Normalize(t))
 
 	names := make([]string, 0, len(t)/2)
 	lbls := make(prometheus.Labels, len(t)/2)
 	for i := 0; i < len(t); i += 2 {
-		key := t[i]
+		key := fqn.Format(t[i])
 		names = append(names, key)
 		lbls[key] = t[i+1]
 	}
