@@ -1,3 +1,4 @@
+// Package prometheus implements an prometheus stats client.
 package prometheus
 
 import (

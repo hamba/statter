@@ -1,5 +1,7 @@
 module github.com/hamba/statter
 
+go 1.11
+
 require (
 	github.com/cactus/go-statsd-client v3.1.1+incompatible
 	github.com/kr/pretty v0.1.0 // indirect
