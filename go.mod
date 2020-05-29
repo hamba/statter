@@ -7,6 +7,6 @@ require (
 	github.com/golang/protobuf v1.3.3 // indirect
 	github.com/prometheus/client_golang v1.5.1
 	github.com/prometheus/procfs v0.0.10 // indirect
-	github.com/stretchr/testify v1.5.1
+	github.com/stretchr/testify v1.6.0
 	golang.org/x/sys v0.0.0-20200219091948-cb0a6d8edb6c // indirect
 )
