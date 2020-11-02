@@ -4,7 +4,7 @@ package statsd
 import (
 	"time"
 
-	"github.com/cactus/go-statsd-client/statsd"
+	"github.com/cactus/go-statsd-client/v4/statsd"
 	"github.com/hamba/statter/internal/bytes"
 	"github.com/hamba/statter/internal/tags"
 )
