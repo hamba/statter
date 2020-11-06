@@ -46,7 +46,7 @@ func TestBuffer(t *testing.T) {
 	}{
 		{
 			name: "WriteByte",
-			fn:   func() { buf.WriteByte('v') },
+			fn:   func() { _ = buf.WriteByte('v') },
 			want: "v",
 		},
 		{
@@ -56,7 +56,7 @@ func TestBuffer(t *testing.T) {
 		},
 		{
 			name: "Write",
-			fn:   func() { buf.Write([]byte("foo")) },
+			fn:   func() { _, _ = buf.Write([]byte("foo")) },
 			want: "foo",
 		},
 		{

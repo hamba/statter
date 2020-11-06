@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cactus/go-statsd-client/statsd"
-	"github.com/cactus/go-statsd-client/statsd/statsdtest"
+	"github.com/cactus/go-statsd-client/v4/statsd"
+	"github.com/cactus/go-statsd-client/v4/statsd/statsdtest"
 	"github.com/stretchr/testify/assert"
 )
 
