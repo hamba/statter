@@ -1,0 +1,23 @@
+run:
+  tests: false
+  timeout: 5m
+linters:
+  enable-all: true
+  disable:
+    - exhaustive
+    - exhaustivestruct
+    - funlen
+    - gochecknoglobals
+    - gochecknoinits
+    - gocognit
+    - gocyclo
+    - goerr113
+    - gomnd
+    - nestif
+    - noctx
+    - nlreturn
+    - scopelint
+    - wrapcheck
+    - wsl
+    - gofumpt
+    - godox

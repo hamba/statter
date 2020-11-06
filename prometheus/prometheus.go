@@ -151,7 +151,7 @@ func (s *Prometheus) Timing(name string, value time.Duration, rate float32, tags
 	m.With(lbls).Observe(float64(value) / float64(time.Millisecond))
 }
 
-// Close closes the client and flushes buffered stats, if applicable
+// Close closes the client and flushes buffered stats, if applicable.
 func (s *Prometheus) Close() error {
 	return nil
 }

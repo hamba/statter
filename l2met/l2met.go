@@ -18,11 +18,7 @@ type Logger interface {
 type SamplerFunc func(float32) bool
 
 func defaultSampler(rate float32) bool {
-	if rand.Float32() < rate {
-		return true
-	}
-
-	return false
+	return rand.Float32() < rate //nolint:gosec
 }
 
 // OptsFunc represents a function that configures L2met.
@@ -103,7 +99,7 @@ func (s *L2met) Timing(name string, value time.Duration, rate float32, tags ...s
 	)
 }
 
-// render outputs the metric to the logger
+// render outputs the metric to the logger.
 func (s *L2met) render(measure, name string, value interface{}, rate float32, t []string) {
 	if !s.includeStat(rate) {
 		return
@@ -129,7 +125,7 @@ func (s *L2met) includeStat(rate float32) bool {
 	return s.sampler(rate)
 }
 
-// Close closes the client and flushes buffered stats, if applicable
+// Close closes the client and flushes buffered stats, if applicable.
 func (s *L2met) Close() error {
 	return nil
 }
@@ -143,7 +139,7 @@ func (s *L2met) formatRate(rate float32) string {
 	}
 
 	buf := pool.Get()
-	buf.WriteByte('@')
+	_ = buf.WriteByte('@')
 	buf.AppendFloat(float64(rate), 'f', -1, 32)
 	res := string(buf.Bytes())
 	pool.Put(buf)
@@ -174,10 +170,10 @@ func formatDuration(d time.Duration) string {
 			break
 		}
 
-		buf.WriteByte('.')
+		_ = buf.WriteByte('.')
 
 		for om > 0 {
-			buf.WriteByte('0')
+			_ = buf.WriteByte('0')
 			om--
 		}
 

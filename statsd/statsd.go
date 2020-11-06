@@ -16,7 +16,12 @@ type Statsd struct {
 
 // New returns a statsd instance.
 func New(addr, prefix string) (*Statsd, error) {
-	c, err := statsd.NewClient(addr, prefix)
+	config := &statsd.ClientConfig{
+		Address:     addr,
+		Prefix:      prefix,
+		UseBuffered: false,
+	}
+	c, err := statsd.NewClientWithConfig(config)
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +49,7 @@ func (s *Statsd) Timing(name string, value time.Duration, rate float32, tags ...
 	_ = s.client.TimingDuration(name, value, rate)
 }
 
-// Close closes the client and flushes buffered stats, if applicable
+// Close closes the client and flushes buffered stats, if applicable.
 func (s *Statsd) Close() error {
 	return s.client.Close()
 }
@@ -84,7 +89,14 @@ func NewBuffered(addr, prefix string, opts ...BufferedStatsdFunc) (*BufferedStat
 		o(s)
 	}
 
-	c, err := statsd.NewBufferedClient(addr, prefix, s.flushInterval, s.flushBytes)
+	config := &statsd.ClientConfig{
+		Address:       addr,
+		Prefix:        prefix,
+		UseBuffered:   true,
+		FlushInterval: s.flushInterval,
+		FlushBytes:    s.flushBytes,
+	}
+	c, err := statsd.NewClientWithConfig(config)
 	if err != nil {
 		return nil, err
 	}
@@ -111,14 +123,14 @@ func (s *BufferedStatsd) Timing(name string, value time.Duration, rate float32, 
 	_ = s.client.TimingDuration(name, value, rate)
 }
 
-// Close closes the client and flushes buffered stats, if applicable
+// Close closes the client and flushes buffered stats, if applicable.
 func (s *BufferedStatsd) Close() error {
 	return s.client.Close()
 }
 
 var pool = bytes.NewPool(512)
 
-// formatTags formats into an InfluxDB style string
+// formatTags formats into an InfluxDB style string.
 func formatTags(t []string) string {
 	if len(t) == 0 {
 		return ""
@@ -128,9 +140,9 @@ func formatTags(t []string) string {
 
 	buf := pool.Get()
 	for i := 0; i < len(t); i += 2 {
-		buf.WriteByte(',')
+		_ = buf.WriteByte(',')
 		buf.WriteString(t[i])
-		buf.WriteByte('=')
+		_ = buf.WriteByte('=')
 		buf.WriteString(t[i+1])
 	}
 
