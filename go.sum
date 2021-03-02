@@ -5,6 +5,7 @@ github.com/VictoriaMetrics/metrics v1.13.1/go.mod h1:Z1tSfPfngDn12bTfZSCqArT3OPY
 github.com/VictoriaMetrics/metrics v1.14.0/go.mod h1:Z1tSfPfngDn12bTfZSCqArT3OPY3u88J12hSoOhuiRE=
 github.com/VictoriaMetrics/metrics v1.15.0/go.mod h1:Z1tSfPfngDn12bTfZSCqArT3OPY3u88J12hSoOhuiRE=
 github.com/VictoriaMetrics/metrics v1.15.1/go.mod h1:Z1tSfPfngDn12bTfZSCqArT3OPY3u88J12hSoOhuiRE=
+github.com/VictoriaMetrics/metrics v1.15.2/go.mod h1:Z1tSfPfngDn12bTfZSCqArT3OPY3u88J12hSoOhuiRE=
 github.com/cactus/go-statsd-client/v4 v4.0.0 h1:cjO9CI3GAHtj/Vmmt1/BRq8+hf5MXy/Pr/CM6Dy4dp0=
 github.com/cactus/go-statsd-client/v4 v4.0.0/go.mod h1:m73kwJp6TN0Ja9P6ycdZhWM1MlfxY/95WZ//IptPQ+Y=
 github.com/davecgh/go-spew v1.1.0 h1:ZDRjVQ15GmhC3fiQ8ni8+OwkZQO4DARzQgrnXU1Liz8=
