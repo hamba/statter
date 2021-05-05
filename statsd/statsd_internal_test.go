@@ -4,9 +4,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cactus/go-statsd-client/v4/statsd"
-	"github.com/cactus/go-statsd-client/v4/statsd/statsdtest"
+	"github.com/cactus/go-statsd-client/v5/statsd"
+	"github.com/cactus/go-statsd-client/v5/statsd/statsdtest"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNew(t *testing.T) {
@@ -22,7 +23,7 @@ func TestNew(t *testing.T) {
 
 func TestStatsd_Inc(t *testing.T) {
 	sender := statsdtest.NewRecordingSender()
-	client, err := statsd.NewClientWithSender(sender, "test")
+	client, err := statsd.NewClientWithSender(sender, "test", statsd.InfixComma)
 	assert.NoError(t, err)
 
 	s := &Statsd{
@@ -39,7 +40,7 @@ func TestStatsd_Inc(t *testing.T) {
 
 func TestStatsd_Gauge(t *testing.T) {
 	sender := statsdtest.NewRecordingSender()
-	client, err := statsd.NewClientWithSender(sender, "test")
+	client, err := statsd.NewClientWithSender(sender, "test", statsd.InfixComma)
 	assert.NoError(t, err)
 
 	s := &Statsd{
@@ -56,7 +57,7 @@ func TestStatsd_Gauge(t *testing.T) {
 
 func TestStatsd_Timing(t *testing.T) {
 	sender := statsdtest.NewRecordingSender()
-	client, err := statsd.NewClientWithSender(sender, "test")
+	client, err := statsd.NewClientWithSender(sender, "test", statsd.InfixComma)
 	assert.NoError(t, err)
 
 	s := &Statsd{
@@ -86,7 +87,7 @@ func TestNewBuffered(t *testing.T) {
 
 func TestBuffered_Inc(t *testing.T) {
 	sender := statsdtest.NewRecordingSender()
-	client, err := statsd.NewClientWithSender(sender, "test")
+	client, err := statsd.NewClientWithSender(sender, "test", statsd.InfixComma)
 	assert.NoError(t, err)
 
 	s := &BufferedStatsd{
@@ -103,7 +104,7 @@ func TestBuffered_Inc(t *testing.T) {
 
 func TestBuffered_Gauge(t *testing.T) {
 	sender := statsdtest.NewRecordingSender()
-	client, err := statsd.NewClientWithSender(sender, "test")
+	client, err := statsd.NewClientWithSender(sender, "test", statsd.InfixComma)
 	assert.NoError(t, err)
 
 	s := &BufferedStatsd{
@@ -120,7 +121,7 @@ func TestBuffered_Gauge(t *testing.T) {
 
 func TestBuffered_Timing(t *testing.T) {
 	sender := statsdtest.NewRecordingSender()
-	client, err := statsd.NewClientWithSender(sender, "test")
+	client, err := statsd.NewClientWithSender(sender, "test", statsd.InfixComma)
 	assert.NoError(t, err)
 
 	s := &BufferedStatsd{
@@ -130,49 +131,7 @@ func TestBuffered_Timing(t *testing.T) {
 	s.Timing("test", time.Second, 1.0, "test", "test")
 
 	sent := sender.GetSent()
-	assert.Len(t, sent, 1)
+	require.Len(t, sent, 1)
 	assert.Equal(t, "test.test,test=test", sent[0].Stat)
 	assert.Equal(t, "1000", sent[0].Value)
-}
-
-func TestFormatTags(t *testing.T) {
-	tags := []string{
-		"test", "test",
-		"foo", "bar",
-		"test", "baz",
-	}
-
-	assert.Equal(t, "", formatTags(nil))
-	assert.Equal(t, "", formatTags([]string{}))
-
-	got := formatTags(tags)
-
-	expect := ",test=baz,foo=bar"
-	assert.Equal(t, expect, got)
-}
-
-func TestFormatTags_Uneven(t *testing.T) {
-	tags := []string{
-		"test", "test",
-		"foo",
-	}
-
-	s := formatTags(tags)
-
-	assert.Equal(t, ",test=test,foo=nil,STATTER_ERROR=Normalised odd number of tags by adding nil", s)
-}
-
-func BenchmarkFormatTags(b *testing.B) {
-	tags := []string{
-		"string1", "test1",
-		"string2", "test2",
-		"string3", "test3",
-		"string4", "test4",
-	}
-
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		formatTags(tags)
-	}
 }
