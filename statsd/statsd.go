@@ -4,8 +4,7 @@ package statsd
 import (
 	"time"
 
-	"github.com/cactus/go-statsd-client/v4/statsd"
-	"github.com/hamba/statter/internal/bytes"
+	"github.com/cactus/go-statsd-client/v5/statsd"
 	"github.com/hamba/statter/internal/tags"
 )
 
@@ -20,6 +19,7 @@ func New(addr, prefix string) (*Statsd, error) {
 		Address:     addr,
 		Prefix:      prefix,
 		UseBuffered: false,
+		TagFormat:   statsd.InfixSemicolon,
 	}
 	c, err := statsd.NewClientWithConfig(config)
 	if err != nil {
@@ -33,20 +33,17 @@ func New(addr, prefix string) (*Statsd, error) {
 
 // Inc increments a count by the value.
 func (s *Statsd) Inc(name string, value int64, rate float32, tags ...string) {
-	name += formatTags(tags)
-	_ = s.client.Inc(name, value, rate)
+	_ = s.client.Inc(name, value, rate, toTags(tags)...)
 }
 
 // Gauge measures the value of a metric.
 func (s *Statsd) Gauge(name string, value float64, rate float32, tags ...string) {
-	name += formatTags(tags)
-	_ = s.client.Gauge(name, int64(value), rate)
+	_ = s.client.Gauge(name, int64(value), rate, toTags(tags)...)
 }
 
 // Timing sends the value of a Duration.
 func (s *Statsd) Timing(name string, value time.Duration, rate float32, tags ...string) {
-	name += formatTags(tags)
-	_ = s.client.TimingDuration(name, value, rate)
+	_ = s.client.TimingDuration(name, value, rate, toTags(tags)...)
 }
 
 // Close closes the client and flushes buffered stats, if applicable.
@@ -95,6 +92,7 @@ func NewBuffered(addr, prefix string, opts ...BufferedStatsdFunc) (*BufferedStat
 		UseBuffered:   true,
 		FlushInterval: s.flushInterval,
 		FlushBytes:    s.flushBytes,
+		TagFormat:     statsd.InfixComma,
 	}
 	c, err := statsd.NewClientWithConfig(config)
 	if err != nil {
@@ -107,20 +105,17 @@ func NewBuffered(addr, prefix string, opts ...BufferedStatsdFunc) (*BufferedStat
 
 // Inc increments a count by the value.
 func (s *BufferedStatsd) Inc(name string, value int64, rate float32, tags ...string) {
-	name += formatTags(tags)
-	_ = s.client.Inc(name, value, rate)
+	_ = s.client.Inc(name, value, rate, toTags(tags)...)
 }
 
 // Gauge measures the value of a metric.
 func (s *BufferedStatsd) Gauge(name string, value float64, rate float32, tags ...string) {
-	name += formatTags(tags)
-	_ = s.client.Gauge(name, int64(value), rate)
+	_ = s.client.Gauge(name, int64(value), rate, toTags(tags)...)
 }
 
 // Timing sends the value of a Duration.
 func (s *BufferedStatsd) Timing(name string, value time.Duration, rate float32, tags ...string) {
-	name += formatTags(tags)
-	_ = s.client.TimingDuration(name, value, rate)
+	_ = s.client.TimingDuration(name, value, rate, toTags(tags)...)
 }
 
 // Close closes the client and flushes buffered stats, if applicable.
@@ -128,25 +123,12 @@ func (s *BufferedStatsd) Close() error {
 	return s.client.Close()
 }
 
-var pool = bytes.NewPool(512)
+func toTags(t []string) []statsd.Tag {
+	t = tags.Normalize(t)
 
-// formatTags formats into an InfluxDB style string.
-func formatTags(t []string) string {
-	if len(t) == 0 {
-		return ""
-	}
-
-	t = tags.Deduplicate(tags.Normalize(t))
-
-	buf := pool.Get()
+	res := make([]statsd.Tag, 0, len(t)/2)
 	for i := 0; i < len(t); i += 2 {
-		_ = buf.WriteByte(',')
-		buf.WriteString(t[i])
-		_ = buf.WriteByte('=')
-		buf.WriteString(t[i+1])
+		res = append(res, statsd.Tag{t[i], t[i+1]})
 	}
-
-	s := string(buf.Bytes())
-	pool.Put(buf)
-	return s
+	return res
 }
