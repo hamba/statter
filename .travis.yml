@@ -2,6 +2,7 @@ sudo: false
 
 language: go
 go:
+  - "1.15.x"
   - "1.16.x"
   - "1.x"
 
@@ -14,7 +15,7 @@ cache:
 
 before_install:
   - curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | bash -s -- -b $GOPATH/bin ${GOLANGCI_LINT_VERSION}
-  - go install github.com/mattn/goveralls # Use `go install` in Go1.16
+  - GO111MODULE=off go get -u github.com/mattn/goveralls # Use `go install` in Go1.16
   - go mod download
 
 script:
