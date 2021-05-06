@@ -6,18 +6,20 @@ linters:
   disable:
     - exhaustive
     - exhaustivestruct
-    - funlen
     - gochecknoglobals
-    - gochecknoinits
     - gocognit
     - gocyclo
-    - goerr113
     - gomnd
+    - interfacer
     - nestif
-    - noctx
     - nlreturn
+    - maligned
     - scopelint
     - wrapcheck
     - wsl
-    - gofumpt
-    - godox
+
+issues:
+  exclude-rules:
+    - path: internal/bytes/buffer.go
+      linters:
+        - forcetypeassert
