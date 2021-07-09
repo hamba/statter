@@ -1,3 +1,4 @@
+// Package runtime implements runtime stats collection convenience functions.
 package runtime
 
 import (

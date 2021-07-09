@@ -38,3 +38,6 @@ issues:
     - path: internal/bytes/buffer.go
       linters:
         - govet
+    - path: generate.go
+      linters:
+        - lll

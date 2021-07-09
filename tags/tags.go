@@ -26,5 +26,5 @@ func Int64(k string, v int64) statter.Tag {
 // code int the form '2xx'.
 func StatusCode(k string, v int) statter.Tag {
 	code := strconv.Itoa(v)
-	return [2]string{k, string(code[0])+"xx"}
+	return [2]string{k, string(code[0]) + "xx"}
 }
