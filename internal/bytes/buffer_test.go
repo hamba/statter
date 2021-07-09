@@ -1,17 +1,18 @@
-package bytes
+package bytes_test
 
 import (
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/hamba/statter/internal/bytes"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestPool(t *testing.T) {
 	const dummyData = "dummy data"
 
-	p := NewPool(512)
+	p := bytes.NewPool(512)
 
 	var wg sync.WaitGroup
 	for i := 0; i < 10; i++ {
@@ -37,7 +38,7 @@ func TestPool(t *testing.T) {
 }
 
 func TestBuffer(t *testing.T) {
-	buf := NewPool(512).Get()
+	buf := bytes.NewPool(512).Get()
 
 	tests := []struct {
 		name string
@@ -46,7 +47,7 @@ func TestBuffer(t *testing.T) {
 	}{
 		{
 			name: "WriteByte",
-			fn:   func() { _ = buf.WriteByte('v') },
+			fn:   func() { buf.WriteByte('v') },
 			want: "v",
 		},
 		{
@@ -56,7 +57,7 @@ func TestBuffer(t *testing.T) {
 		},
 		{
 			name: "Write",
-			fn:   func() { _, _ = buf.Write([]byte("foo")) },
+			fn:   func() { buf.Write([]byte("foo")) },
 			want: "foo",
 		},
 		{

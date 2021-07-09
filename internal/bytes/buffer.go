@@ -1,3 +1,4 @@
+// Package bytes implements performant bytes implementations.
 package bytes
 
 import (
@@ -63,9 +64,8 @@ func (b *Buffer) AppendTime(t time.Time, layout string) {
 }
 
 // WriteByte writes a single byte to the Buffer.
-func (b *Buffer) WriteByte(v byte) error {
+func (b *Buffer) WriteByte(v byte) {
 	b.b = append(b.b, v)
-	return nil
 }
 
 // WriteString writes a string to the Buffer.
@@ -74,10 +74,8 @@ func (b *Buffer) WriteString(s string) {
 }
 
 // Write implements io.Writer.
-func (b *Buffer) Write(bs []byte) (int, error) {
+func (b *Buffer) Write(bs []byte) {
 	b.b = append(b.b, bs...)
-
-	return len(bs), nil
 }
 
 // Len returns the length of the underlying byte slice.
