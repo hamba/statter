@@ -24,13 +24,13 @@ func newRegistry(root *Statter, d time.Duration) *registry {
 		done: make(chan struct{}),
 	}
 
+	reg.wg.Add(1)
 	go reg.runReportLoop(d)
 
 	return reg
 }
 
 func (r *registry) runReportLoop(d time.Duration) {
-	r.wg.Add(1)
 	defer r.wg.Done()
 
 	tick := time.NewTicker(d)

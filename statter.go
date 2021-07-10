@@ -6,7 +6,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-	"unsafe"
 
 	"github.com/hamba/statter/internal/stats"
 )
@@ -317,8 +316,11 @@ type Histogram struct {
 
 func newHistogram(hr HistogramReporter, name string, tags [][2]string, pool *stats.Pool) *Histogram {
 	if hr != nil {
-		return &Histogram{
-			hrFn: hr.Histogram(name, tags),
+		fn := hr.Histogram(name, tags)
+		if fn != nil {
+			return &Histogram{
+				hrFn: fn,
+			}
 		}
 	}
 
@@ -343,10 +345,12 @@ func (h *Histogram) Observe(v float64) {
 }
 
 func (h *Histogram) value() *stats.Sample {
-	// Swap the new sample with the old.
-	ptr := (*unsafe.Pointer)(unsafe.Pointer(&h.s))
-	oldPtr := atomic.SwapPointer(ptr, unsafe.Pointer(h.pool.Get()))
-	return (*stats.Sample)(oldPtr)
+	h.mu.Lock()
+	s := h.s
+	h.s = h.pool.Get()
+	h.mu.Unlock()
+
+	return s
 }
 
 // Timing implements a timing.
@@ -362,8 +366,11 @@ type Timing struct {
 
 func newTiming(tr TimingReporter, name string, tags [][2]string, pool *stats.Pool) *Timing {
 	if tr != nil {
-		return &Timing{
-			trFn: tr.Timing(name, tags),
+		fn := tr.Timing(name, tags)
+		if fn != nil {
+			return &Timing{
+				trFn: fn,
+			}
 		}
 	}
 
@@ -391,10 +398,12 @@ func (t *Timing) Observe(d time.Duration) {
 }
 
 func (t *Timing) value() *stats.Sample {
-	// Swap the new sample with the old.
-	ptr := (*unsafe.Pointer)(unsafe.Pointer(&t.s))
-	oldPtr := atomic.SwapPointer(ptr, unsafe.Pointer(t.pool.Get()))
-	return (*stats.Sample)(oldPtr)
+	t.mu.Lock()
+	s := t.s
+	t.s = t.pool.Get()
+	t.mu.Unlock()
+
+	return s
 }
 
 type nullReporter struct{}
