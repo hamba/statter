@@ -336,6 +336,10 @@ func (r *mockSimpleReporter) Gauge(name string, v float64, tags [][2]string) {
 	_ = r.Called(name, v, tags)
 }
 
+func (r *mockSimpleReporter) Close() error {
+	return nil
+}
+
 type mockComplexReporter struct {
 	mock.Mock
 }
