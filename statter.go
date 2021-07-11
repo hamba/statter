@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/hamba/statter/internal/stats"
+	"github.com/hamba/statter/v2/internal/stats"
 )
 
 // DiscardReporter is a reporter that discards all stats.

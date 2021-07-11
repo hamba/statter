@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hamba/statter/internal/bytes"
+	"github.com/hamba/statter/v2/internal/bytes"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -3,8 +3,8 @@ package tags_test
 import (
 	"testing"
 
-	"github.com/hamba/statter"
-	"github.com/hamba/statter/tags"
+	"github.com/hamba/statter/v2"
+	"github.com/hamba/statter/v2/tags"
 	"github.com/stretchr/testify/assert"
 )
 

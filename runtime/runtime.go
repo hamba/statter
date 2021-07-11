@@ -5,7 +5,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/hamba/statter"
+	"github.com/hamba/statter/v2"
 )
 
 // DefaultRuntimeInterval is the default runtime collection interval.
