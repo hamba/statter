@@ -10,8 +10,8 @@ import (
 	"github.com/hamba/statter/internal/stats"
 )
 
-// NullReporter is a reporter that discards all stats.
-var NullReporter = nullReporter{}
+// DiscardReporter is a reporter that discards all stats.
+var DiscardReporter = discardReporter{}
 
 // Reporter represents a stats reporter.
 type Reporter interface {
@@ -406,15 +406,15 @@ func (t *Timing) value() *stats.Sample {
 	return s
 }
 
-type nullReporter struct{}
+type discardReporter struct{}
 
-func (r nullReporter) Counter(_ string, _ int64, _ [][2]string) {}
-func (r nullReporter) Gauge(_ string, _ float64, _ [][2]string) {}
+func (r discardReporter) Counter(_ string, _ int64, _ [][2]string) {}
+func (r discardReporter) Gauge(_ string, _ float64, _ [][2]string) {}
 
-func (r nullReporter) Histogram(_ string, _ [][2]string) func(float64) {
+func (r discardReporter) Histogram(_ string, _ [][2]string) func(float64) {
 	return func(_ float64) {}
 }
 
-func (r nullReporter) Timing(_ string, _ [][2]string) func(time.Duration) {
+func (r discardReporter) Timing(_ string, _ [][2]string) func(time.Duration) {
 	return func(_ time.Duration) {}
 }

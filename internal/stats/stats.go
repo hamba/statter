@@ -41,7 +41,7 @@ func (p *Pool) Put(s *Sample) {
 //
 // The incremental stats are based on the algorithm
 // described here:
-// https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance.
+// https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance .
 type Sample struct {
 	sum float64
 	max float64

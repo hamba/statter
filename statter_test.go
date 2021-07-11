@@ -39,6 +39,8 @@ func TestStatter_CallsReporter(t *testing.T) {
 		assert.FailNow(t, "expected call to reporter timed out")
 	case <-m.Ch():
 	}
+
+	m.AssertExpectations(t)
 }
 
 func TestStatter_With(t *testing.T) {
@@ -58,7 +60,7 @@ func TestStatter_With(t *testing.T) {
 }
 
 func TestStatter_WithReturnsIdenticalStatter(t *testing.T) {
-	stats := statter.New(statter.NullReporter, time.Second)
+	stats := statter.New(statter.DiscardReporter, time.Second)
 	t.Cleanup(func() { _ = stats.Close() })
 
 	s1 := stats.With("test", tags.Str("tag", "test"))
@@ -83,7 +85,7 @@ func TestStatter_Counter(t *testing.T) {
 }
 
 func TestStatter_CounterReturnsIdenticalCounter(t *testing.T) {
-	stats := statter.New(statter.NullReporter, time.Second)
+	stats := statter.New(statter.DiscardReporter, time.Second)
 	t.Cleanup(func() { _ = stats.Close() })
 
 	c1 := stats.Counter("test", tags.Str("tag", "test"))
@@ -108,7 +110,7 @@ func TestStatter_Gauge(t *testing.T) {
 }
 
 func TestStatter_GaugeReturnsIdenticalCounter(t *testing.T) {
-	stats := statter.New(statter.NullReporter, time.Second)
+	stats := statter.New(statter.DiscardReporter, time.Second)
 	t.Cleanup(func() { _ = stats.Close() })
 
 	g1 := stats.Gauge("test", tags.Str("tag", "test"))
@@ -197,7 +199,7 @@ func TestStatter_HistogramAggregatedSwapsSamples(t *testing.T) {
 }
 
 func TestStatter_HistogramReturnsIdenticalCounter(t *testing.T) {
-	stats := statter.New(statter.NullReporter, time.Second)
+	stats := statter.New(statter.DiscardReporter, time.Second)
 	t.Cleanup(func() { _ = stats.Close() })
 
 	h1 := stats.Histogram("test", tags.Str("tag", "test"))
@@ -298,7 +300,7 @@ func TestStatter_AggregatedCallsNothingIfNoValues(t *testing.T) {
 }
 
 func TestStatter_TimingReturnsIdenticalCounter(t *testing.T) {
-	stats := statter.New(statter.NullReporter, time.Second)
+	stats := statter.New(statter.DiscardReporter, time.Second)
 	t.Cleanup(func() { _ = stats.Close() })
 
 	t1 := stats.Timing("test", tags.Str("tag", "test"))
@@ -309,7 +311,7 @@ func TestStatter_TimingReturnsIdenticalCounter(t *testing.T) {
 }
 
 func TestStatter_CloseFromSubStatterFails(t *testing.T) {
-	stats := statter.New(statter.NullReporter, time.Second).With("prefix", tags.Str("base", "val"))
+	stats := statter.New(statter.DiscardReporter, time.Second).With("prefix", tags.Str("base", "val"))
 
 	err := stats.Close()
 
@@ -317,9 +319,9 @@ func TestStatter_CloseFromSubStatterFails(t *testing.T) {
 }
 
 func TestNullReporter(t *testing.T) {
-	assert.Implements(t, (*statter.Reporter)(nil), statter.NullReporter)
-	assert.Implements(t, (*statter.HistogramReporter)(nil), statter.NullReporter)
-	assert.Implements(t, (*statter.TimingReporter)(nil), statter.NullReporter)
+	assert.Implements(t, (*statter.Reporter)(nil), statter.DiscardReporter)
+	assert.Implements(t, (*statter.HistogramReporter)(nil), statter.DiscardReporter)
+	assert.Implements(t, (*statter.TimingReporter)(nil), statter.DiscardReporter)
 }
 
 type mockSimpleReporter struct {

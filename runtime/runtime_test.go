@@ -11,8 +11,8 @@ import (
 
 func TestRuntime(t *testing.T) {
 	m := &mockComplexReporter{}
-	m.On("Gauge", mock.Anything, mock.Anything, mock.Anything)
-	m.On("Timing", mock.Anything, mock.Anything).Return(func(_ time.Duration) {})
+	m.On("Gauge", mock.AnythingOfType("string"), mock.AnythingOfType("float64"), mock.AnythingOfType("[][2]string"))
+	m.On("Timing", mock.AnythingOfType("string"), mock.AnythingOfType("[][2]string")).Return(func(_ time.Duration) {})
 	stats := statter.New(m, time.Millisecond)
 	t.Cleanup(func() { _ = stats.Close() })
 
@@ -22,7 +22,7 @@ func TestRuntime(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	m.AssertCalled(t, "Gauge", "runtime.cpu.goroutines", mock.Anything, mock.Anything)
+	m.AssertCalled(t, "Gauge", "runtime.cpu.goroutines", mock.AnythingOfType("float64"), mock.AnythingOfType("[][2]string"))
 }
 
 type mockComplexReporter struct {

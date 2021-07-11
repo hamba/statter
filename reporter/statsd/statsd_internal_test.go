@@ -17,8 +17,21 @@ func TestNew(t *testing.T) {
 	t.Cleanup(func() { _ = s.Close() })
 
 	assert.Implements(t, (*statter.Reporter)(nil), s)
-	assert.Equal(t, time.Second, s.flushInterval)
-	assert.Equal(t, 1, s.flushBytes)
+	assert.Equal(t, time.Second, s.cfg.flushInterval)
+	assert.Equal(t, 1, s.cfg.flushBytes)
+
+	_, err = New("127.0", "test")
+	assert.Error(t, err)
+}
+
+func TestNew_Defaults(t *testing.T) {
+	s, err := New("127.0.0.1:1234", "test")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = s.Close() })
+
+	assert.Implements(t, (*statter.Reporter)(nil), s)
+	assert.Equal(t, 300*time.Millisecond, s.cfg.flushInterval)
+	assert.Equal(t, 1432, s.cfg.flushBytes)
 
 	_, err = New("127.0", "test")
 	assert.Error(t, err)

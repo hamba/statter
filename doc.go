@@ -1,4 +1,4 @@
 /*
-Package statter is a statistics collector with multiple reporters.
+Package statter is a statistics collector with multiple reporters..
 */
 package statter

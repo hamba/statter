@@ -7,56 +7,67 @@ import (
 	"github.com/cactus/go-statsd-client/v5/statsd"
 )
 
+type config struct {
+	flushInterval time.Duration
+	flushBytes    int
+}
+
+func defaultConfig() config {
+	return config{
+		flushInterval: 300 * time.Millisecond,
+		flushBytes:    1432,
+	}
+}
+
 // Option represents statsd option function.
-type Option func(*Statsd)
+type Option func(*config)
 
 // WithFlushInterval sets the maximum flushInterval for packet sending.
 // Defaults to 300ms.
 func WithFlushInterval(interval time.Duration) Option {
-	return func(s *Statsd) {
-		s.flushInterval = interval
+	return func(c *config) {
+		c.flushInterval = interval
 	}
 }
 
 // WithFlushBytes sets the maximum udp packet size that will be sent.
 // Defaults to 1432 flushBytes.
 func WithFlushBytes(bytes int) Option {
-	return func(s *Statsd) {
-		s.flushBytes = bytes
+	return func(c *config) {
+		c.flushBytes = bytes
 	}
 }
 
 // Statsd is a statsd client.
 type Statsd struct {
+	cfg    config
 	client statsd.Statter
-
-	flushInterval time.Duration
-	flushBytes    int
 }
 
 // New returns a statsd reporter.
 func New(addr, prefix string, opts ...Option) (*Statsd, error) {
-	s := &Statsd{}
-
+	cfg := defaultConfig()
 	for _, o := range opts {
-		o(s)
+		o(&cfg)
 	}
 
-	config := &statsd.ClientConfig{
+	clientCfg := &statsd.ClientConfig{
 		Address:       addr,
 		Prefix:        prefix,
 		UseBuffered:   true,
-		FlushInterval: s.flushInterval,
-		FlushBytes:    s.flushBytes,
+		FlushInterval: cfg.flushInterval,
+		FlushBytes:    cfg.flushBytes,
 		TagFormat:     statsd.InfixComma,
 	}
-	c, err := statsd.NewClientWithConfig(config)
+	c, err := statsd.NewClientWithConfig(clientCfg)
 	if err != nil {
 		return nil, err
 	}
-	s.client = c
 
-	return s, nil
+	return &Statsd{
+		cfg:    cfg,
+		client: c,
+	}, nil
 }
 
 // Counter reports a counter value.

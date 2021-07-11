@@ -5,6 +5,11 @@ import (
 	"unsafe"
 )
 
+const (
+	keySep    = ':'
+	keyTagSep = '='
+)
+
 var keyPool = sync.Pool{
 	New: func() interface{} {
 		return &key{b: make([]byte, 0, 256)}
@@ -30,9 +35,9 @@ func newKey(name string, tags []Tag) *key {
 	sortTags(tags)
 
 	for _, tag := range tags {
-		k.b = append(k.b, ':')
+		k.b = append(k.b, keySep)
 		k.b = append(k.b, tag[0]...)
-		k.b = append(k.b, '=')
+		k.b = append(k.b, keyTagSep)
 		k.b = append(k.b, tag[1]...)
 	}
 
@@ -53,7 +58,7 @@ func putKey(k *key) {
 
 func sortTags(tags []Tag) {
 	var sorted bool
-	for {
+	for !sorted {
 		sorted = true
 		lmo := len(tags) - 1
 		for i := 0; i < lmo; i++ {
@@ -61,9 +66,6 @@ func sortTags(tags []Tag) {
 				tags[i+1], tags[i] = tags[i], tags[i+1]
 				sorted = false
 			}
-		}
-		if sorted {
-			return
 		}
 	}
 }
