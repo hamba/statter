@@ -1,6 +1,7 @@
 package statter
 
 import (
+	"io"
 	"math"
 	"strconv"
 	"sync"
@@ -263,9 +264,19 @@ func (s *Statter) mergeDescriptors(name string, tags []Tag) (string, [][2]string
 	return name, newTags
 }
 
-// Close closes the statter.
+// Close closes the statter and reporter.
 func (s *Statter) Close() error {
-	return s.reg.Close(s)
+	if err := s.reg.Close(s); err != nil {
+		return err
+	}
+
+	if c, ok := s.r.(io.Closer); ok {
+		if err := c.Close(); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // Counter implements a counter.
