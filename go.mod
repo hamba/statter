@@ -1,4 +1,4 @@
-module github.com/hamba/statter
+module github.com/hamba/statter/v2
 
 go 1.16
 

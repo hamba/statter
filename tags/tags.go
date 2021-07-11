@@ -4,7 +4,7 @@ package tags
 import (
 	"strconv"
 
-	"github.com/hamba/statter"
+	"github.com/hamba/statter/v2"
 )
 
 // Str returns a string tag with the give key and value.

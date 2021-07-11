@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hamba/statter"
-	"github.com/hamba/statter/runtime"
+	"github.com/hamba/statter/v2"
+	"github.com/hamba/statter/v2/runtime"
 	"github.com/stretchr/testify/mock"
 )
 

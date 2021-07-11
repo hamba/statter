@@ -4,7 +4,7 @@ package l2met
 import (
 	"github.com/hamba/logger/v2"
 	"github.com/hamba/logger/v2/ctx"
-	"github.com/hamba/statter/internal/bytes"
+	"github.com/hamba/statter/v2/internal/bytes"
 )
 
 // L2met is a l2met client.

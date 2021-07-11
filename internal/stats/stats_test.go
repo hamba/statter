@@ -4,7 +4,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/hamba/statter/internal/stats"
+	"github.com/hamba/statter/v2/internal/stats"
 	"github.com/stretchr/testify/assert"
 )
 

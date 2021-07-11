@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/hamba/logger/v2"
-	"github.com/hamba/statter"
-	l2met2 "github.com/hamba/statter/reporter/l2met"
+	"github.com/hamba/statter/v2"
+	l2met2 "github.com/hamba/statter/v2/reporter/l2met"
 	"github.com/stretchr/testify/assert"
 )
 

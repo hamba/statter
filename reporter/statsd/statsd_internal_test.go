@@ -6,7 +6,7 @@ import (
 
 	"github.com/cactus/go-statsd-client/v5/statsd"
 	"github.com/cactus/go-statsd-client/v5/statsd/statsdtest"
-	"github.com/hamba/statter"
+	"github.com/hamba/statter/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

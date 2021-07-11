@@ -3,8 +3,8 @@ package statter_test
 import (
 	"time"
 
-	"github.com/hamba/statter"
-	"github.com/hamba/statter/tags"
+	"github.com/hamba/statter/v2"
+	"github.com/hamba/statter/v2/tags"
 )
 
 func ExampleCounter_Inc() {

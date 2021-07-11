@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hamba/statter"
-	"github.com/hamba/statter/reporter/prometheus"
-	"github.com/hamba/statter/tags"
+	"github.com/hamba/statter/v2"
+	"github.com/hamba/statter/v2/reporter/prometheus"
+	"github.com/hamba/statter/v2/tags"
 )
 
 func BenchmarkStatter_Counter(b *testing.B) {
