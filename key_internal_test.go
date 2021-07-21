@@ -41,9 +41,8 @@ func TestKey(t *testing.T) {
 			t.Parallel()
 
 			k := newKey(test.keyName, test.keyTags)
-			defer putKey(k)
 
-			assert.Equal(t, test.want, k.String())
+			assert.Equal(t, test.want, k)
 		})
 	}
 }
@@ -56,8 +55,7 @@ func BenchmarkKey(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			k := newKey("test", tags)
-
-			putKey(k)
+			_ = k
 		}
 	})
 }
