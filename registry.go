@@ -61,12 +61,11 @@ func (r *registry) SubStatter(parent *Statter, prefix string, tags []Tag) *Statt
 	name, tags := mergeDescriptors(parent.prefix, parent.cfg.separator, prefix, parent.tags, tags)
 
 	k := newKey(name, tags)
-	defer putKey(k)
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if s, ok := r.statters[k.String()]; ok {
+	if s, ok := r.statters[k]; ok {
 		return s
 	}
 
@@ -80,7 +79,7 @@ func (r *registry) SubStatter(parent *Statter, prefix string, tags []Tag) *Statt
 		prefix: name,
 		tags:   tags,
 	}
-	r.statters[k.String()] = s
+	r.statters[k] = s
 
 	return s
 }
