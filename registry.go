@@ -76,6 +76,7 @@ func (r *registry) SubStatter(parent *Statter, prefix string, tags []Tag) *Statt
 		r:      parent.r,
 		hr:     parent.hr,
 		tr:     parent.tr,
+		pool:   parent.pool,
 		prefix: name,
 		tags:   tags,
 	}
