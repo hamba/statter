@@ -2,6 +2,7 @@ package statter
 
 import (
 	"sync"
+	"unsafe"
 )
 
 const (
@@ -19,16 +20,15 @@ type key struct {
 	b []byte
 }
 
-func newKey(name string, tags []Tag) string {
+func newKey(name string, tags []Tag) *key {
 	k := keyPool.Get().(*key)
-	defer keyPool.Put(k)
-
 	k.b = k.b[:0]
+
 	k.b = append(k.b, name...)
 
 	// Short path for no tags.
 	if len(tags) == 0 {
-		return string(k.b)
+		return k
 	}
 
 	// The tags must be sorted to create a consistent key.
@@ -41,7 +41,26 @@ func newKey(name string, tags []Tag) string {
 		k.b = append(k.b, tag[1]...)
 	}
 
+	return k
+}
+
+// String returns the key as a string.
+//
+// The returned string should only be used while
+// holding a reference to the key, nor should it be
+// stored.
+func (k *key) String() string {
+	return *(*string)(unsafe.Pointer(&k.b))
+}
+
+// SafeString returns the key as a string that
+// is safe to use after releasing the key.
+func (k *key) SafeString() string {
 	return string(k.b)
+}
+
+func putKey(k *key) {
+	keyPool.Put(k)
 }
 
 func sortTags(tags []Tag) {

@@ -126,15 +126,17 @@ func (s *Statter) With(prefix string, tags ...Tag) *Statter {
 func (s *Statter) Counter(name string, tags ...Tag) *Counter {
 	k := newKey(name, tags)
 
-	c, ok := s.counters.Load(k)
+	c, ok := s.counters.Load(k.String())
 	if !ok {
 		n, t := s.mergeDescriptors(name, tags)
 		counter := &Counter{
 			name: n,
 			tags: t,
 		}
-		c, _ = s.counters.LoadOrStore(k, counter)
+		c, _ = s.counters.LoadOrStore(k.SafeString(), counter)
 	}
+
+	putKey(k)
 
 	return c
 }
@@ -143,15 +145,17 @@ func (s *Statter) Counter(name string, tags ...Tag) *Counter {
 func (s *Statter) Gauge(name string, tags ...Tag) *Gauge {
 	k := newKey(name, tags)
 
-	g, ok := s.gauges.Load(k)
+	g, ok := s.gauges.Load(k.String())
 	if !ok {
 		n, t := s.mergeDescriptors(name, tags)
 		gauge := &Gauge{
 			name: n,
 			tags: t,
 		}
-		g, _ = s.gauges.LoadOrStore(k, gauge)
+		g, _ = s.gauges.LoadOrStore(k.SafeString(), gauge)
 	}
+
+	putKey(k)
 
 	return g
 }
@@ -160,12 +164,14 @@ func (s *Statter) Gauge(name string, tags ...Tag) *Gauge {
 func (s *Statter) Histogram(name string, tags ...Tag) *Histogram {
 	k := newKey(name, tags)
 
-	h, ok := s.histograms.Load(k)
+	h, ok := s.histograms.Load(k.String())
 	if !ok {
 		n, t := s.mergeDescriptors(name, tags)
 		histogram := newHistogram(s.hr, n, t, s.pool)
-		h, _ = s.histograms.LoadOrStore(k, histogram)
+		h, _ = s.histograms.LoadOrStore(k.SafeString(), histogram)
 	}
+
+	putKey(k)
 
 	return h
 }
@@ -174,12 +180,14 @@ func (s *Statter) Histogram(name string, tags ...Tag) *Histogram {
 func (s *Statter) Timing(name string, tags ...Tag) *Timing {
 	k := newKey(name, tags)
 
-	t, ok := s.timings.Load(k)
+	t, ok := s.timings.Load(k.String())
 	if !ok {
 		n, newTags := s.mergeDescriptors(name, tags)
 		timing := newTiming(s.tr, n, newTags, s.pool)
-		t, _ = s.timings.LoadOrStore(k, timing)
+		t, _ = s.timings.LoadOrStore(k.SafeString(), timing)
 	}
+
+	putKey(k)
 
 	return t
 }
