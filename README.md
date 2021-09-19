@@ -14,7 +14,7 @@ Go stats clients
 Install with:
 
 ```shell
-go get github.com/hamba/statter
+go get github.com/hamba/statter/v2
 ```
 
 #### Supported stats clients
