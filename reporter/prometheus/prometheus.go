@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hamba/statter/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -17,7 +18,7 @@ type Option func(p *Prometheus)
 // WithBuckets sets the buckets to used with histograms.
 func WithBuckets(buckets []float64) Option {
 	return func(p *Prometheus) {
-		p.buckets = buckets
+		p.defBuckets = buckets
 	}
 }
 
@@ -27,7 +28,9 @@ type Prometheus struct {
 
 	fqn *fqn
 
-	buckets    []float64
+	defBuckets []float64
+	buckets    bucketMap
+
 	reg        *prometheus.Registry
 	counters   counterMap
 	gauges     gaugeMap
@@ -40,10 +43,10 @@ func New(namespace string, opts ...Option) *Prometheus {
 	fqn := newFQN()
 
 	p := &Prometheus{
-		namespace: fqn.Format(namespace),
-		fqn:       fqn,
-		buckets:   prometheus.DefBuckets,
-		reg:       prometheus.NewRegistry(),
+		namespace:  fqn.Format(namespace),
+		fqn:        fqn,
+		defBuckets: prometheus.DefBuckets,
+		reg:        prometheus.NewRegistry(),
 	}
 
 	for _, opt := range opts {
@@ -113,13 +116,15 @@ func (p *Prometheus) Histogram(name string, tags [][2]string) func(v float64) {
 	lblNames, lbls := formatTags(tags, p.fqn)
 	key := createKey(name, lblNames)
 
+	buckets := p.getBuckets(name)
+
 	m, ok := p.histograms.Load(key)
 	if !ok {
 		histo := prometheus.NewHistogramVec(
 			prometheus.HistogramOpts{
 				Namespace: p.namespace,
 				Name:      p.fqn.Format(name),
-				Buckets:   p.buckets,
+				Buckets:   buckets,
 				Help:      name,
 			},
 			lblNames,
@@ -142,13 +147,15 @@ func (p *Prometheus) Timing(name string, tags [][2]string) func(v time.Duration)
 	lblNames, lbls := formatTags(tags, p.fqn)
 	key := createKey(name, lblNames)
 
+	buckets := p.getBuckets(name)
+
 	m, ok := p.timings.Load(key)
 	if !ok {
 		timing := prometheus.NewHistogramVec(
 			prometheus.HistogramOpts{
 				Namespace: p.namespace,
 				Name:      p.fqn.Format(name),
-				Buckets:   p.buckets,
+				Buckets:   buckets,
 				Help:      name,
 			},
 			lblNames,
@@ -166,9 +173,27 @@ func (p *Prometheus) Timing(name string, tags [][2]string) func(v time.Duration)
 	}
 }
 
+func (p *Prometheus) getBuckets(name string) []float64 {
+	b, ok := p.buckets.Load(name)
+	if !ok {
+		return p.defBuckets
+	}
+	return b
+}
+
 // Close closes the client and flushes buffered stats, if applicable.
 func (p *Prometheus) Close() error {
 	return nil
+}
+
+// SetBuckets sets the buckets for a metric by name.
+func SetBuckets(stats *statter.Statter, name string, buckets []float64) {
+	prom, ok := stats.Reporter().(*Prometheus)
+	if !ok {
+		return
+	}
+
+	prom.buckets.Store(name, buckets)
 }
 
 // createKey creates a unique metric key.

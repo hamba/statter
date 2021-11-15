@@ -3,7 +3,7 @@ include github.com/hamba/make/golang
 # Generate Go files
 generate:
 	@echo "==> Generating"
-	@go get -modfile go.tools.mod github.com/a8m/syncmap
+	@go install -modfile go.tools.mod github.com/a8m/syncmap
 	@go generate
 	@echo "==> Done"
 .PHONY: generate

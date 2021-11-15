@@ -122,6 +122,13 @@ func (s *Statter) With(prefix string, tags ...Tag) *Statter {
 	return s.reg.SubStatter(s, prefix, tags)
 }
 
+// Reporter returns the stats reporter.
+//
+// The reporter should not be used directly.
+func (s *Statter) Reporter() Reporter {
+	return s.r
+}
+
 // Counter returns a counter for the given name and tags.
 func (s *Statter) Counter(name string, tags ...Tag) *Counter {
 	k := newKey(name, tags)

@@ -121,3 +121,39 @@ func TestPrometheus_Close(t *testing.T) {
 
 	assert.NoError(t, err)
 }
+
+func TestSetBuckets_Hitrogram(t *testing.T) {
+	p := prometheus.New("test.test")
+	stats := statter.New(p, time.Second)
+
+	prometheus.SetBuckets(stats, "test", []float64{0.1, 1.0})
+
+	p.Histogram("test", [][2]string{{"foo", "bar"}})(0.0123)
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/metrics", nil)
+	p.Handler().ServeHTTP(rr, req)
+
+	assert.Contains(t, rr.Body.String(), "test_test_test_bucket{foo=\"bar\",le=\"0.1\"} 1")
+	assert.Contains(t, rr.Body.String(), "test_test_test_bucket{foo=\"bar\",le=\"1\"} 1")
+	assert.Contains(t, rr.Body.String(), "test_test_test_sum{foo=\"bar\"} 0.0123")
+	assert.Contains(t, rr.Body.String(), "test_test_test_count{foo=\"bar\"} 1")
+}
+
+func TestSetBuckets_Timing(t *testing.T) {
+	p := prometheus.New("test.test")
+	stats := statter.New(p, time.Second)
+
+	prometheus.SetBuckets(stats, "test", []float64{0.1, 1.0})
+
+	p.Timing("test", [][2]string{{"foo", "bar"}})(1234500 * time.Nanosecond)
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/metrics", nil)
+	p.Handler().ServeHTTP(rr, req)
+
+	assert.Contains(t, rr.Body.String(), "test_test_test_bucket{foo=\"bar\",le=\"0.1\"} 1")
+	assert.Contains(t, rr.Body.String(), "test_test_test_bucket{foo=\"bar\",le=\"1\"} 1")
+	assert.Contains(t, rr.Body.String(), "test_test_test_sum{foo=\"bar\"} 0.0012345")
+	assert.Contains(t, rr.Body.String(), "test_test_test_count{foo=\"bar\"} 1")
+}
