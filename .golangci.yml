@@ -27,8 +27,10 @@ linters:
     - gochecknoglobals
     - goerr113
     - gomnd
+    - ireturn
     - nlreturn
     - maligned
+    - varnamelen
     - wrapcheck
     - wsl
 
