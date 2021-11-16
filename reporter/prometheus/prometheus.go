@@ -186,8 +186,11 @@ func (p *Prometheus) Close() error {
 	return nil
 }
 
-// SetBuckets sets the buckets for a metric by name.
-func SetBuckets(stats *statter.Statter, name string, buckets []float64) {
+// SetMetricBuckets sets the buckets for a metric by name.
+//
+// This must be called before the metric is used, otherwise will be
+// ignored or can have unexpected results.
+func SetMetricBuckets(stats *statter.Statter, name string, buckets []float64) {
 	prom, ok := stats.Reporter().(*Prometheus)
 	if !ok {
 		return
@@ -201,7 +204,7 @@ func createKey(name string, lblNames []string) string {
 	return name + strings.Join(lblNames, ":")
 }
 
-// formatTags create a prometheus Label map from tags.
+// formatTags creates a prometheus Label map from tags.
 func formatTags(tags [][2]string, fqn *fqn) ([]string, prometheus.Labels) {
 	names := make([]string, 0, len(tags))
 	lbls := make(prometheus.Labels, len(tags))
