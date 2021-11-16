@@ -10,8 +10,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"unsafe"
-
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Map is like a Go map[interface{}]interface{} but is safe for concurrent use
@@ -29,7 +27,7 @@ import (
 // contention compared to a Go map paired with a separate Mutex or RWMutex.
 //
 // The zero Map is empty and ready for use. A Map must not be copied after first use.
-type histogramMap struct {
+type bucketMap struct {
 	mu sync.Mutex
 
 	// read contains the portion of the map's contents that are safe for
@@ -53,7 +51,7 @@ type histogramMap struct {
 	//
 	// If the dirty map is nil, the next write to the map will initialize it by
 	// making a shallow copy of the clean map, omitting stale entries.
-	dirty map[string]*entryHistogramMap
+	dirty map[string]*entryBucketMap
 
 	// misses counts the number of loads since the read map was last updated that
 	// needed to lock mu to determine whether the key was present.
@@ -65,17 +63,17 @@ type histogramMap struct {
 }
 
 // readOnly is an immutable struct stored atomically in the Map.read field.
-type readOnlyHistogramMap struct {
-	m       map[string]*entryHistogramMap
+type readOnlyBucketMap struct {
+	m       map[string]*entryBucketMap
 	amended bool // true if the dirty map contains some key not in m.
 }
 
 // expunged is an arbitrary pointer that marks entries which have been deleted
 // from the dirty map.
-var expungedHistogramMap = unsafe.Pointer(new(*prometheus.HistogramVec))
+var expungedBucketMap = unsafe.Pointer(new([]float64))
 
 // An entry is a slot in the map corresponding to a particular key.
-type entryHistogramMap struct {
+type entryBucketMap struct {
 	// p points to the interface{} value stored for the entry.
 	//
 	// If p == nil, the entry has been deleted, and either m.dirty == nil or
@@ -98,22 +96,22 @@ type entryHistogramMap struct {
 	p unsafe.Pointer // *interface{}
 }
 
-func newEntryHistogramMap(i *prometheus.HistogramVec) *entryHistogramMap {
-	return &entryHistogramMap{p: unsafe.Pointer(&i)}
+func newEntryBucketMap(i []float64) *entryBucketMap {
+	return &entryBucketMap{p: unsafe.Pointer(&i)}
 }
 
 // Load returns the value stored in the map for a key, or nil if no
 // value is present.
 // The ok result indicates whether value was found in the map.
-func (m *histogramMap) Load(key string) (value *prometheus.HistogramVec, ok bool) {
-	read, _ := m.read.Load().(readOnlyHistogramMap)
+func (m *bucketMap) Load(key string) (value []float64, ok bool) {
+	read, _ := m.read.Load().(readOnlyBucketMap)
 	e, ok := read.m[key]
 	if !ok && read.amended {
 		m.mu.Lock()
 		// Avoid reporting a spurious miss if m.dirty got promoted while we were
 		// blocked on m.mu. (If further loads of the same key will not miss, it's
 		// not worth copying the dirty map for this key.)
-		read, _ = m.read.Load().(readOnlyHistogramMap)
+		read, _ = m.read.Load().(readOnlyBucketMap)
 		e, ok = read.m[key]
 		if !ok && read.amended {
 			e, ok = m.dirty[key]
@@ -130,23 +128,23 @@ func (m *histogramMap) Load(key string) (value *prometheus.HistogramVec, ok bool
 	return e.load()
 }
 
-func (e *entryHistogramMap) load() (value *prometheus.HistogramVec, ok bool) {
+func (e *entryBucketMap) load() (value []float64, ok bool) {
 	p := atomic.LoadPointer(&e.p)
-	if p == nil || p == expungedHistogramMap {
+	if p == nil || p == expungedBucketMap {
 		return value, false
 	}
-	return *(**prometheus.HistogramVec)(p), true
+	return *(*[]float64)(p), true
 }
 
 // Store sets the value for a key.
-func (m *histogramMap) Store(key string, value *prometheus.HistogramVec) {
-	read, _ := m.read.Load().(readOnlyHistogramMap)
+func (m *bucketMap) Store(key string, value []float64) {
+	read, _ := m.read.Load().(readOnlyBucketMap)
 	if e, ok := read.m[key]; ok && e.tryStore(&value) {
 		return
 	}
 
 	m.mu.Lock()
-	read, _ = m.read.Load().(readOnlyHistogramMap)
+	read, _ = m.read.Load().(readOnlyBucketMap)
 	if e, ok := read.m[key]; ok {
 		if e.unexpungeLocked() {
 			// The entry was previously expunged, which implies that there is a
@@ -161,9 +159,9 @@ func (m *histogramMap) Store(key string, value *prometheus.HistogramVec) {
 			// We're adding the first new key to the dirty map.
 			// Make sure it is allocated and mark the read-only map as incomplete.
 			m.dirtyLocked()
-			m.read.Store(readOnlyHistogramMap{m: read.m, amended: true})
+			m.read.Store(readOnlyBucketMap{m: read.m, amended: true})
 		}
-		m.dirty[key] = newEntryHistogramMap(value)
+		m.dirty[key] = newEntryBucketMap(value)
 	}
 	m.mu.Unlock()
 }
@@ -172,10 +170,10 @@ func (m *histogramMap) Store(key string, value *prometheus.HistogramVec) {
 //
 // If the entry is expunged, tryStore returns false and leaves the entry
 // unchanged.
-func (e *entryHistogramMap) tryStore(i **prometheus.HistogramVec) bool {
+func (e *entryBucketMap) tryStore(i *[]float64) bool {
 	for {
 		p := atomic.LoadPointer(&e.p)
-		if p == expungedHistogramMap {
+		if p == expungedBucketMap {
 			return false
 		}
 		if atomic.CompareAndSwapPointer(&e.p, p, unsafe.Pointer(i)) {
@@ -188,23 +186,23 @@ func (e *entryHistogramMap) tryStore(i **prometheus.HistogramVec) bool {
 //
 // If the entry was previously expunged, it must be added to the dirty map
 // before m.mu is unlocked.
-func (e *entryHistogramMap) unexpungeLocked() (wasExpunged bool) {
-	return atomic.CompareAndSwapPointer(&e.p, expungedHistogramMap, nil)
+func (e *entryBucketMap) unexpungeLocked() (wasExpunged bool) {
+	return atomic.CompareAndSwapPointer(&e.p, expungedBucketMap, nil)
 }
 
 // storeLocked unconditionally stores a value to the entry.
 //
 // The entry must be known not to be expunged.
-func (e *entryHistogramMap) storeLocked(i **prometheus.HistogramVec) {
+func (e *entryBucketMap) storeLocked(i *[]float64) {
 	atomic.StorePointer(&e.p, unsafe.Pointer(i))
 }
 
 // LoadOrStore returns the existing value for the key if present.
 // Otherwise, it stores and returns the given value.
 // The loaded result is true if the value was loaded, false if stored.
-func (m *histogramMap) LoadOrStore(key string, value *prometheus.HistogramVec) (actual *prometheus.HistogramVec, loaded bool) {
+func (m *bucketMap) LoadOrStore(key string, value []float64) (actual []float64, loaded bool) {
 	// Avoid locking if it's a clean hit.
-	read, _ := m.read.Load().(readOnlyHistogramMap)
+	read, _ := m.read.Load().(readOnlyBucketMap)
 	if e, ok := read.m[key]; ok {
 		actual, loaded, ok := e.tryLoadOrStore(value)
 		if ok {
@@ -213,7 +211,7 @@ func (m *histogramMap) LoadOrStore(key string, value *prometheus.HistogramVec) (
 	}
 
 	m.mu.Lock()
-	read, _ = m.read.Load().(readOnlyHistogramMap)
+	read, _ = m.read.Load().(readOnlyBucketMap)
 	if e, ok := read.m[key]; ok {
 		if e.unexpungeLocked() {
 			m.dirty[key] = e
@@ -227,9 +225,9 @@ func (m *histogramMap) LoadOrStore(key string, value *prometheus.HistogramVec) (
 			// We're adding the first new key to the dirty map.
 			// Make sure it is allocated and mark the read-only map as incomplete.
 			m.dirtyLocked()
-			m.read.Store(readOnlyHistogramMap{m: read.m, amended: true})
+			m.read.Store(readOnlyBucketMap{m: read.m, amended: true})
 		}
-		m.dirty[key] = newEntryHistogramMap(value)
+		m.dirty[key] = newEntryBucketMap(value)
 		actual, loaded = value, false
 	}
 	m.mu.Unlock()
@@ -242,13 +240,13 @@ func (m *histogramMap) LoadOrStore(key string, value *prometheus.HistogramVec) (
 //
 // If the entry is expunged, tryLoadOrStore leaves the entry unchanged and
 // returns with ok==false.
-func (e *entryHistogramMap) tryLoadOrStore(i *prometheus.HistogramVec) (actual *prometheus.HistogramVec, loaded, ok bool) {
+func (e *entryBucketMap) tryLoadOrStore(i []float64) (actual []float64, loaded, ok bool) {
 	p := atomic.LoadPointer(&e.p)
-	if p == expungedHistogramMap {
+	if p == expungedBucketMap {
 		return actual, false, false
 	}
 	if p != nil {
-		return *(**prometheus.HistogramVec)(p), true, true
+		return *(*[]float64)(p), true, true
 	}
 
 	// Copy the interface after the first load to make this method more amenable
@@ -260,23 +258,23 @@ func (e *entryHistogramMap) tryLoadOrStore(i *prometheus.HistogramVec) (actual *
 			return i, false, true
 		}
 		p = atomic.LoadPointer(&e.p)
-		if p == expungedHistogramMap {
+		if p == expungedBucketMap {
 			return actual, false, false
 		}
 		if p != nil {
-			return *(**prometheus.HistogramVec)(p), true, true
+			return *(*[]float64)(p), true, true
 		}
 	}
 }
 
 // LoadAndDelete deletes the value for a key, returning the previous value if any.
 // The loaded result reports whether the key was present.
-func (m *histogramMap) LoadAndDelete(key string) (value *prometheus.HistogramVec, loaded bool) {
-	read, _ := m.read.Load().(readOnlyHistogramMap)
+func (m *bucketMap) LoadAndDelete(key string) (value []float64, loaded bool) {
+	read, _ := m.read.Load().(readOnlyBucketMap)
 	e, ok := read.m[key]
 	if !ok && read.amended {
 		m.mu.Lock()
-		read, _ = m.read.Load().(readOnlyHistogramMap)
+		read, _ = m.read.Load().(readOnlyBucketMap)
 		e, ok = read.m[key]
 		if !ok && read.amended {
 			e, ok = m.dirty[key]
@@ -295,18 +293,18 @@ func (m *histogramMap) LoadAndDelete(key string) (value *prometheus.HistogramVec
 }
 
 // Delete deletes the value for a key.
-func (m *histogramMap) Delete(key string) {
+func (m *bucketMap) Delete(key string) {
 	m.LoadAndDelete(key)
 }
 
-func (e *entryHistogramMap) delete() (value *prometheus.HistogramVec, ok bool) {
+func (e *entryBucketMap) delete() (value []float64, ok bool) {
 	for {
 		p := atomic.LoadPointer(&e.p)
-		if p == nil || p == expungedHistogramMap {
+		if p == nil || p == expungedBucketMap {
 			return value, false
 		}
 		if atomic.CompareAndSwapPointer(&e.p, p, nil) {
-			return *(**prometheus.HistogramVec)(p), true
+			return *(*[]float64)(p), true
 		}
 	}
 }
@@ -321,21 +319,21 @@ func (e *entryHistogramMap) delete() (value *prometheus.HistogramVec, ok bool) {
 //
 // Range may be O(N) with the number of elements in the map even if f returns
 // false after a constant number of calls.
-func (m *histogramMap) Range(f func(key string, value *prometheus.HistogramVec) bool) {
+func (m *bucketMap) Range(f func(key string, value []float64) bool) {
 	// We need to be able to iterate over all of the keys that were already
 	// present at the start of the call to Range.
 	// If read.amended is false, then read.m satisfies that property without
 	// requiring us to hold m.mu for a long time.
-	read, _ := m.read.Load().(readOnlyHistogramMap)
+	read, _ := m.read.Load().(readOnlyBucketMap)
 	if read.amended {
 		// m.dirty contains keys not in read.m. Fortunately, Range is already O(N)
 		// (assuming the caller does not break out early), so a call to Range
 		// amortizes an entire copy of the map: we can promote the dirty copy
 		// immediately!
 		m.mu.Lock()
-		read, _ = m.read.Load().(readOnlyHistogramMap)
+		read, _ = m.read.Load().(readOnlyBucketMap)
 		if read.amended {
-			read = readOnlyHistogramMap{m: m.dirty}
+			read = readOnlyBucketMap{m: m.dirty}
 			m.read.Store(read)
 			m.dirty = nil
 			m.misses = 0
@@ -354,23 +352,23 @@ func (m *histogramMap) Range(f func(key string, value *prometheus.HistogramVec) 
 	}
 }
 
-func (m *histogramMap) missLocked() {
+func (m *bucketMap) missLocked() {
 	m.misses++
 	if m.misses < len(m.dirty) {
 		return
 	}
-	m.read.Store(readOnlyHistogramMap{m: m.dirty})
+	m.read.Store(readOnlyBucketMap{m: m.dirty})
 	m.dirty = nil
 	m.misses = 0
 }
 
-func (m *histogramMap) dirtyLocked() {
+func (m *bucketMap) dirtyLocked() {
 	if m.dirty != nil {
 		return
 	}
 
-	read, _ := m.read.Load().(readOnlyHistogramMap)
-	m.dirty = make(map[string]*entryHistogramMap, len(read.m))
+	read, _ := m.read.Load().(readOnlyBucketMap)
+	m.dirty = make(map[string]*entryBucketMap, len(read.m))
 	for k, e := range read.m {
 		if !e.tryExpungeLocked() {
 			m.dirty[k] = e
@@ -378,13 +376,13 @@ func (m *histogramMap) dirtyLocked() {
 	}
 }
 
-func (e *entryHistogramMap) tryExpungeLocked() (isExpunged bool) {
+func (e *entryBucketMap) tryExpungeLocked() (isExpunged bool) {
 	p := atomic.LoadPointer(&e.p)
 	for p == nil {
-		if atomic.CompareAndSwapPointer(&e.p, nil, expungedHistogramMap) {
+		if atomic.CompareAndSwapPointer(&e.p, nil, expungedBucketMap) {
 			return true
 		}
 		p = atomic.LoadPointer(&e.p)
 	}
-	return p == expungedHistogramMap
+	return p == expungedBucketMap
 }
