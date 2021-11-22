@@ -317,7 +317,7 @@ func (g *Gauge) Set(v float64) {
 }
 
 func (g *Gauge) value() float64 {
-	v := atomic.SwapUint64(&g.val, 0)
+	v := atomic.LoadUint64(&g.val)
 	return math.Float64frombits(v)
 }
 
