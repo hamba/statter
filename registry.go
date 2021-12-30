@@ -101,8 +101,11 @@ func (r *registry) Close(caller *Statter) error {
 }
 
 func mergeDescriptors(prefix, sep, name string, baseTags, tags []Tag) (string, []Tag) {
-	if prefix != "" {
+	switch {
+	case prefix != "" && name != "":
 		name = prefix + sep + name
+	case name == "":
+		name = prefix
 	}
 
 	newTags := make([]Tag, 0, len(baseTags)+len(tags))

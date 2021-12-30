@@ -50,7 +50,8 @@ func TestStatter_With(t *testing.T) {
 	stats := statter.New(m, time.Second)
 
 	stats.With("prefix", tags.Str("base", "val")).
-		With("prefix2", tags.Str("base2", "val2")).
+		With("", tags.Str("base2", "val2")).
+		With("prefix2").
 		Counter("test", tags.Str("tag", "test")).Inc(2)
 
 	err := stats.Close()
