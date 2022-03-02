@@ -116,10 +116,9 @@ func (p *Prometheus) Histogram(name string, tags [][2]string) func(v float64) {
 	lblNames, lbls := formatTags(tags, p.fqn)
 	key := createKey(name, lblNames)
 
-	buckets := p.getBuckets(name)
-
 	m, ok := p.histograms.Load(key)
 	if !ok {
+		buckets := p.getBuckets(name)
 		histo := prometheus.NewHistogramVec(
 			prometheus.HistogramOpts{
 				Namespace: p.namespace,
@@ -147,10 +146,9 @@ func (p *Prometheus) Timing(name string, tags [][2]string) func(v time.Duration)
 	lblNames, lbls := formatTags(tags, p.fqn)
 	key := createKey(name, lblNames)
 
-	buckets := p.getBuckets(name)
-
 	m, ok := p.timings.Load(key)
 	if !ok {
+		buckets := p.getBuckets(name)
 		timing := prometheus.NewHistogramVec(
 			prometheus.HistogramOpts{
 				Namespace: p.namespace,
