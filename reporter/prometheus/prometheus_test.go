@@ -122,7 +122,78 @@ func TestPrometheus_Close(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestSetBuckets_Hitrogram(t *testing.T) {
+func TestRegisterCounter(t *testing.T) {
+	p := prometheus.New("foo.bar")
+	stats := statter.New(p, time.Second).With("baz")
+
+	prometheus.RegisterCounter(stats, "bat", []string{"label1"}, "my awesome counter")
+
+	p.Counter("baz.bat", 1, [][2]string{{"label1", "value1"}})
+
+	req := httptest.NewRequest("GET", "/metrics", nil)
+	rec := httptest.NewRecorder()
+	p.Handler().ServeHTTP(rec, req)
+
+	assert.Contains(t, rec.Body.String(), `HELP foo_bar_baz_bat my awesome counter`)
+	assert.Contains(t, rec.Body.String(), `foo_bar_baz_bat{label1="value1"} 1`)
+}
+
+func TestRegisterGauge(t *testing.T) {
+	p := prometheus.New("foo.bar")
+	stats := statter.New(p, time.Second).With("baz")
+
+	prometheus.RegisterGauge(stats, "bat", []string{"label1"}, "my awesome gauge")
+
+	p.Gauge("baz.bat", 1.23, [][2]string{{"label1", "value1"}})
+
+	req := httptest.NewRequest("GET", "/metrics", nil)
+	rec := httptest.NewRecorder()
+	p.Handler().ServeHTTP(rec, req)
+
+	assert.Contains(t, rec.Body.String(), `HELP foo_bar_baz_bat my awesome gauge`)
+	assert.Contains(t, rec.Body.String(), `foo_bar_baz_bat{label1="value1"} 1.23`)
+}
+
+func TestRegisterHistogram(t *testing.T) {
+	p := prometheus.New("foo.bar")
+	stats := statter.New(p, time.Second).With("baz")
+
+	prometheus.RegisterHistogram(stats, "bat", []string{"label1"}, []float64{0.1, 1.0}, "my awesome histogram")
+
+	p.Histogram("baz.bat", [][2]string{{"label1", "value1"}})(0.0123)
+
+	req := httptest.NewRequest("GET", "/metrics", nil)
+	rec := httptest.NewRecorder()
+	p.Handler().ServeHTTP(rec, req)
+
+	assert.Contains(t, rec.Body.String(), `HELP foo_bar_baz_bat my awesome histogram`)
+	assert.Contains(t, rec.Body.String(), "foo_bar_baz_bat_bucket{label1=\"value1\",le=\"0.1\"} 1")
+	assert.Contains(t, rec.Body.String(), "foo_bar_baz_bat_bucket{label1=\"value1\",le=\"1\"} 1")
+	assert.Contains(t, rec.Body.String(), "foo_bar_baz_bat_sum{label1=\"value1\"} 0.0123")
+	assert.Contains(t, rec.Body.String(), "foo_bar_baz_bat_count{label1=\"value1\"} 1")
+}
+
+func TestRegisterHistogram_HandlesNoBuckets(t *testing.T) {
+	p := prometheus.New("foo.bar")
+	stats := statter.New(p, time.Second).With("baz")
+
+	prometheus.RegisterHistogram(stats, "bat", []string{"label1"}, nil, "my awesome histogram")
+
+	p.Histogram("baz.bat", [][2]string{{"label1", "value1"}})(0.0123)
+
+	req := httptest.NewRequest("GET", "/metrics", nil)
+	rec := httptest.NewRecorder()
+	p.Handler().ServeHTTP(rec, req)
+
+	assert.Contains(t, rec.Body.String(), `HELP foo_bar_baz_bat my awesome histogram`)
+	assert.Contains(t, rec.Body.String(), "foo_bar_baz_bat_bucket{label1=\"value1\",le=\"0.1\"} 1")
+	assert.Contains(t, rec.Body.String(), "foo_bar_baz_bat_bucket{label1=\"value1\",le=\"0.025\"} 1")
+	assert.Contains(t, rec.Body.String(), "foo_bar_baz_bat_bucket{label1=\"value1\",le=\"1\"} 1")
+	assert.Contains(t, rec.Body.String(), "foo_bar_baz_bat_sum{label1=\"value1\"} 0.0123")
+	assert.Contains(t, rec.Body.String(), "foo_bar_baz_bat_count{label1=\"value1\"} 1")
+}
+
+func TestSetBuckets_Histogram(t *testing.T) {
 	p := prometheus.New("test.test")
 	stats := statter.New(p, time.Second)
 

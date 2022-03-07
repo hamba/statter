@@ -188,13 +188,103 @@ func (p *Prometheus) Close() error {
 //
 // This must be called before the metric is used, otherwise will be
 // ignored or can have unexpected results.
+//
+// Deprecated: Use RegisterHistogram instead, this function will be removed in a future release.
 func SetMetricBuckets(stats *statter.Statter, name string, buckets []float64) {
 	prom, ok := stats.Reporter().(*Prometheus)
 	if !ok {
 		return
 	}
 
-	prom.buckets.Store(name, buckets)
+	prom.buckets.Store(stats.FullName(name), buckets)
+}
+
+// RegisterCounter registers a counter with the given label names with the prometheus registrar,
+// returning false if it has already been registered.
+func RegisterCounter(stats *statter.Statter, name string, lblNames []string, help string) bool {
+	prom, ok := stats.Reporter().(*Prometheus)
+	if !ok {
+		return false
+	}
+
+	name = stats.FullName(name)
+	sort.Strings(lblNames)
+
+	counter := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: prom.namespace,
+			Name:      prom.fqn.Format(name),
+			Help:      help,
+		},
+		lblNames,
+	)
+
+	key := createKey(name, lblNames)
+	if vec, ok := prom.counters.LoadOrStore(key, counter); !ok {
+		_ = prom.reg.Register(vec)
+		return true
+	}
+	return false
+}
+
+// RegisterGauge registers a gauge with the given label names with the prometheus registrar,
+// returning false if it has already been registered.
+func RegisterGauge(stats *statter.Statter, name string, lblNames []string, help string) bool {
+	prom, ok := stats.Reporter().(*Prometheus)
+	if !ok {
+		return false
+	}
+
+	name = stats.FullName(name)
+	sort.Strings(lblNames)
+
+	gauge := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: prom.namespace,
+			Name:      prom.fqn.Format(name),
+			Help:      help,
+		},
+		lblNames,
+	)
+
+	key := createKey(name, lblNames)
+	if vec, ok := prom.gauges.LoadOrStore(key, gauge); !ok {
+		_ = prom.reg.Register(vec)
+		return true
+	}
+	return false
+}
+
+// RegisterHistogram registers a histogram with the given label names and buckets with the prometheus registrar,
+// returning false if it has already been registered.
+func RegisterHistogram(stats *statter.Statter, name string, lblNames []string, buckets []float64, help string) bool {
+	prom, ok := stats.Reporter().(*Prometheus)
+	if !ok {
+		return false
+	}
+
+	name = stats.FullName(name)
+	sort.Strings(lblNames)
+	if len(buckets) == 0 {
+		buckets = prom.defBuckets
+	}
+
+	histogram := prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Namespace: prom.namespace,
+			Name:      prom.fqn.Format(name),
+			Buckets:   buckets,
+			Help:      help,
+		},
+		lblNames,
+	)
+
+	key := createKey(name, lblNames)
+	if vec, ok := prom.histograms.LoadOrStore(key, histogram); !ok {
+		_ = prom.reg.Register(vec)
+		return true
+	}
+	return false
 }
 
 // createKey creates a unique metric key.
