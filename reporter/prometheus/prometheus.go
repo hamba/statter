@@ -204,7 +204,7 @@ func SetMetricBuckets(stats *statter.Statter, name string, buckets []float64) {
 func RegisterCounter(stats *statter.Statter, name string, lblNames []string, help string) bool {
 	prom, ok := stats.Reporter().(*Prometheus)
 	if !ok {
-		return false
+		return true
 	}
 
 	name = stats.FullName(name)
@@ -232,7 +232,7 @@ func RegisterCounter(stats *statter.Statter, name string, lblNames []string, hel
 func RegisterGauge(stats *statter.Statter, name string, lblNames []string, help string) bool {
 	prom, ok := stats.Reporter().(*Prometheus)
 	if !ok {
-		return false
+		return true
 	}
 
 	name = stats.FullName(name)
@@ -260,7 +260,7 @@ func RegisterGauge(stats *statter.Statter, name string, lblNames []string, help 
 func RegisterHistogram(stats *statter.Statter, name string, lblNames []string, buckets []float64, help string) bool {
 	prom, ok := stats.Reporter().(*Prometheus)
 	if !ok {
-		return false
+		return true
 	}
 
 	name = stats.FullName(name)
