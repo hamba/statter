@@ -21,3 +21,12 @@ go get github.com/hamba/statter/v2
 * **L2met** Writes l2met to a `Logger` interface
 * **Statsd** Writes statsd to `UDP`
 * **Prometheus** Exposes stats via `HTTP`
+
+## Usage
+
+```go
+reporter := statsd.New(statsdAddr, "")
+stats := statter.New(reporter, 10*time.Second).With("my-prefix")
+
+stats.Counter("my-counter", tags.Str("tag", "value")).Inc(1)
+```
