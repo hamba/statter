@@ -1,3 +1,4 @@
+// Package victoriametrics implements an victoria metrics stats reporter.
 package victoriametrics
 
 import (
@@ -15,8 +16,6 @@ import (
 
 // VictoriaMetrics is a victoria metrics stats reporter.
 type VictoriaMetrics struct {
-	prefix string
-
 	fqn *fqn
 
 	mu     sync.RWMutex
