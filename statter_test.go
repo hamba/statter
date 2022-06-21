@@ -290,6 +290,7 @@ func TestStatter_TimingAggregatedSwapsSamples(t *testing.T) {
 
 func TestStatter_AggregatedCallsNothingIfNoValues(t *testing.T) {
 	m := &mockSimpleReporter{}
+	m.Test(t)
 
 	stats := statter.New(m, time.Second)
 
