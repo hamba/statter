@@ -21,6 +21,7 @@ go get github.com/hamba/statter/v2
 * **L2met** Writes l2met to a `Logger` interface
 * **Statsd** Writes statsd to `UDP`
 * **Prometheus** Exposes stats via `HTTP`
+* **VictoriaMetrics** Exposes stats via `HTTP`
 
 ## Usage
 
