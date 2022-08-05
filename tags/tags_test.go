@@ -31,5 +31,3 @@ func TestStatusCode(t *testing.T) {
 
 	assert.Equal(t, statter.Tag{"key", "2xx"}, tag)
 }
-
-
