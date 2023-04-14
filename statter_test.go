@@ -60,6 +60,18 @@ func TestStatter_With(t *testing.T) {
 	m.AssertExpectations(t)
 }
 
+func TestStatter_WithReturnsTheRootStatterWithEmpty(t *testing.T) {
+	m := &mockSimpleReporter{}
+
+	stats := statter.New(m, time.Second, statter.WithPrefix("prefix"), statter.WithTags(tags.Str("base", "val")))
+	t.Cleanup(func() { _ = stats.Close() })
+
+	got := stats.With("")
+
+	assert.Same(t, stats, got)
+	m.AssertExpectations(t)
+}
+
 func TestStatter_WithReturnsIdenticalStatter(t *testing.T) {
 	stats := statter.New(statter.DiscardReporter, time.Second)
 	t.Cleanup(func() { _ = stats.Close() })

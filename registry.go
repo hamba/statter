@@ -16,10 +16,14 @@ type registry struct {
 }
 
 func newRegistry(root *Statter, d time.Duration) *registry {
+	name, tags := mergeDescriptors("", root.cfg.separator, root.prefix, nil, root.tags)
+	k := newKey(name, tags)
+	defer putKey(k)
+
 	reg := &registry{
 		root: root,
 		statters: map[string]*Statter{
-			"": root,
+			k.SafeString(): root,
 		},
 		done: make(chan struct{}),
 	}
