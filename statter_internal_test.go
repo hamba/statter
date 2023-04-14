@@ -6,6 +6,22 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestWithPrefix(t *testing.T) {
+	cfg := defaultConfig()
+
+	WithPrefix("test-prefix")(&cfg)
+
+	assert.Equal(t, "test-prefix", cfg.prefix)
+}
+
+func TestWithTags(t *testing.T) {
+	cfg := defaultConfig()
+
+	WithTags([2]string{"foo", "bar"}, [2]string{"baz", "bat"})(&cfg)
+
+	assert.Equal(t, []Tag{[2]string{"foo", "bar"}, [2]string{"baz", "bat"}}, cfg.tags)
+}
+
 func TestWithSeparator(t *testing.T) {
 	cfg := defaultConfig()
 

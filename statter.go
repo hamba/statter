@@ -34,6 +34,8 @@ type TimingReporter interface {
 type Tag [2]string
 
 type config struct {
+	prefix      string
+	tags        []Tag
 	separator   string
 	percSamples int
 	percentiles []float64
@@ -49,6 +51,20 @@ func defaultConfig() config {
 
 // Option represents a statter option function.
 type Option func(*config)
+
+// WithPrefix sets the initial prefix on a statter.
+func WithPrefix(prefix string) Option {
+	return func(c *config) {
+		c.prefix = prefix
+	}
+}
+
+// WithTags sets the initial tags on a statter.
+func WithTags(tags ...Tag) Option {
+	return func(c *config) {
+		c.tags = tags
+	}
+}
 
 // WithSeparator sets the key separator on a statter.
 func WithSeparator(sep string) Option {
@@ -101,9 +117,11 @@ func New(r Reporter, interval time.Duration, opts ...Option) *Statter {
 	}
 
 	s := &Statter{
-		cfg:  cfg,
-		r:    r,
-		pool: stats.NewPool(cfg.percSamples),
+		cfg:    cfg,
+		r:      r,
+		pool:   stats.NewPool(cfg.percSamples),
+		prefix: cfg.prefix,
+		tags:   cfg.tags,
 	}
 	s.reg = newRegistry(s, interval)
 
