@@ -95,8 +95,8 @@ type Statter struct {
 	reg *registry
 
 	r    Reporter
-	hr   HistogramReporter
-	tr   TimingReporter
+	hr   *value[HistogramReporter]
+	tr   *value[TimingReporter]
 	pool *stats.Pool
 
 	prefix string
@@ -119,6 +119,8 @@ func New(r Reporter, interval time.Duration, opts ...Option) *Statter {
 	s := &Statter{
 		cfg:    cfg,
 		r:      r,
+		hr:     &value[HistogramReporter]{},
+		tr:     &value[TimingReporter]{},
 		pool:   stats.NewPool(cfg.percSamples),
 		prefix: cfg.prefix,
 		tags:   cfg.tags,
@@ -126,10 +128,10 @@ func New(r Reporter, interval time.Duration, opts ...Option) *Statter {
 	s.reg = newRegistry(s, interval)
 
 	if hr, ok := r.(HistogramReporter); ok {
-		s.hr = hr
+		s.hr.Store(hr)
 	}
 	if tr, ok := r.(TimingReporter); ok {
-		s.tr = tr
+		s.tr.Store(tr)
 	}
 
 	return s
@@ -200,7 +202,7 @@ func (s *Statter) Histogram(name string, tags ...Tag) *Histogram {
 	h, ok := s.histograms.Load(k.String())
 	if !ok {
 		n, t := s.mergeDescriptors(name, tags)
-		histogram := newHistogram(s.hr, n, t, s.pool)
+		histogram := newHistogram(s.hr.Load(), n, t, s.pool)
 		h, _ = s.histograms.LoadOrStore(k.SafeString(), histogram)
 	}
 
@@ -216,7 +218,7 @@ func (s *Statter) Timing(name string, tags ...Tag) *Timing {
 	t, ok := s.timings.Load(k.String())
 	if !ok {
 		n, newTags := s.mergeDescriptors(name, tags)
-		timing := newTiming(s.tr, n, newTags, s.pool)
+		timing := newTiming(s.tr.Load(), n, newTags, s.pool)
 		t, _ = s.timings.LoadOrStore(k.SafeString(), timing)
 	}
 
@@ -240,7 +242,7 @@ func (s *Statter) report() {
 		return true
 	})
 
-	if s.hr == nil {
+	if s.hr.Load() == nil {
 		s.histograms.Range(func(_ string, h *Histogram) bool {
 			histo := h.value()
 			defer s.pool.Put(histo)
@@ -250,7 +252,7 @@ func (s *Statter) report() {
 		})
 	}
 
-	if s.tr == nil {
+	if s.tr.Load() == nil {
 		s.timings.Range(func(_ string, t *Timing) bool {
 			timing := t.value()
 			defer s.pool.Put(timing)
@@ -461,4 +463,21 @@ func (r discardReporter) Histogram(_ string, _ [][2]string) func(float64) {
 
 func (r discardReporter) Timing(_ string, _ [][2]string) func(time.Duration) {
 	return func(_ time.Duration) {}
+}
+
+type value[T any] struct {
+	val atomic.Value
+}
+
+func (v *value[T]) Load() T {
+	var zeroT T
+	val, ok := v.val.Load().(T)
+	if !ok {
+		return zeroT
+	}
+	return val
+}
+
+func (v *value[T]) Store(t T) {
+	v.val.Store(t)
 }

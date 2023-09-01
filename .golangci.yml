@@ -27,6 +27,7 @@ linters:
     - structcheck # deprecated
     - deadcode # deprecated
     - ifshort # deprecated
+    - depguard
     - exhaustive
     - exhaustruct
     - forcetypeassert
