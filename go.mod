@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/VictoriaMetrics/metrics v1.24.0
-	github.com/cactus/go-statsd-client/v5 v5.0.0
+	github.com/cactus/go-statsd-client/v5 v5.1.0
 	github.com/hamba/logger/v2 v2.4.0
 	github.com/prometheus/client_golang v1.16.0
 	github.com/stretchr/testify v1.8.4
