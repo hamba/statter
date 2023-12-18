@@ -3,7 +3,7 @@ module github.com/hamba/statter/v2
 go 1.20
 
 require (
-	github.com/VictoriaMetrics/metrics v1.24.0
+	github.com/VictoriaMetrics/metrics v1.26.1
 	github.com/cactus/go-statsd-client/v5 v5.1.0
 	github.com/hamba/logger/v2 v2.5.0
 	github.com/prometheus/client_golang v1.17.0
@@ -28,7 +28,7 @@ require (
 	github.com/valyala/histogram v1.2.0 // indirect
 	go.opentelemetry.io/otel v1.17.0 // indirect
 	go.opentelemetry.io/otel/trace v1.17.0 // indirect
-	golang.org/x/sys v0.11.0 // indirect
+	golang.org/x/sys v0.15.0 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
