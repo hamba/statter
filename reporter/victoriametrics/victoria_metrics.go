@@ -37,7 +37,7 @@ func New() *VictoriaMetrics {
 
 // Handler gets the victoria metrics HTTP handler.
 func (m *VictoriaMetrics) Handler() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		m.set.WritePrometheus(w)
 	})
 }
