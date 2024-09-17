@@ -277,7 +277,7 @@ func (s *Statter) reportSample(name, suffix string, tags [][2]string, sample *st
 	s.r.Gauge(prefix+"max"+suffix, sample.Max(), tags)
 	ps := s.cfg.percentiles
 	vs := sample.Percentiles(ps)
-	for i := 0; i < len(vs); i++ {
+	for i := range vs {
 		name := prefix + strconv.FormatFloat(ps[i], 'g', -1, 64) + "p" + suffix
 		s.r.Gauge(name, vs[i], tags)
 	}

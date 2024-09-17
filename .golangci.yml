@@ -13,30 +13,23 @@ linters-settings:
   gosec:
     excludes:
       - G103
+      - G115
 
 linters:
   enable-all: true
   disable:
-    - interfacer # deprecated
-    - scopelint # deprecated
-    - maligned # deprecated
-    - golint # deprecated
-    - exhaustivestruct # deprecated
-    - varcheck # deprecated
-    - nosnakecase # deprecated
-    - structcheck # deprecated
-    - deadcode # deprecated
-    - ifshort # deprecated
+    - execinquery # deprecated
+    - exportloopref # deprecated
+    - gomnd # deprecated
     - depguard
+    - err113
     - exhaustive
     - exhaustruct
     - forcetypeassert
     - gochecknoglobals
-    - goerr113
-    - gomnd
     - ireturn
+    - mnd
     - nlreturn
-    - maligned
     - varnamelen
     - wrapcheck
     - wsl
