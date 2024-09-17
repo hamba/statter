@@ -156,6 +156,7 @@ func (s *Sample) percentile(n float64) float64 {
 	return s.perc[clamp(i, 0, len(s.perc)-1)]
 }
 
+//nolint:predeclared
 func clamp(i float64, min, max int) int {
 	if i < float64(min) {
 		return min

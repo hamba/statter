@@ -87,7 +87,7 @@ func (s *Statsd) Close() error {
 
 func toTags(t [][2]string) []statsd.Tag {
 	res := make([]statsd.Tag, len(t))
-	for i := 0; i < len(t); i++ {
+	for i := range t {
 		res[i] = statsd.Tag{t[i][0], t[i][1]}
 	}
 	return res

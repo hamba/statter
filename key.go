@@ -68,7 +68,7 @@ func sortTags(tags []Tag) {
 	for !sorted {
 		sorted = true
 		lmo := len(tags) - 1
-		for i := 0; i < lmo; i++ {
+		for i := range lmo {
 			if tags[i+1][0] < tags[i][0] {
 				tags[i+1], tags[i] = tags[i], tags[i+1]
 				sorted = false
