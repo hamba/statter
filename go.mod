@@ -6,7 +6,7 @@ require (
 	github.com/VictoriaMetrics/metrics v1.35.1
 	github.com/cactus/go-statsd-client/v5 v5.1.0
 	github.com/hamba/logger/v2 v2.7.0
-	github.com/prometheus/client_golang v1.20.4
+	github.com/prometheus/client_golang v1.20.5
 	github.com/stretchr/testify v1.9.0
 	github.com/valyala/fastrand v1.1.0
 )
