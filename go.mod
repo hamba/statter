@@ -3,7 +3,7 @@ module github.com/hamba/statter/v2
 go 1.22
 
 require (
-	github.com/VictoriaMetrics/metrics v1.35.1
+	github.com/VictoriaMetrics/metrics v1.35.2
 	github.com/cactus/go-statsd-client/v5 v5.1.0
 	github.com/hamba/logger/v2 v2.7.0
 	github.com/prometheus/client_golang v1.20.5
