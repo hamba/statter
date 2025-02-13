@@ -1,6 +1,6 @@
 module github.com/hamba/statter/v2
 
-go 1.22
+go 1.23.0
 
 require (
 	github.com/VictoriaMetrics/metrics v1.35.2
