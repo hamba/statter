@@ -20,14 +20,30 @@ type Reporter interface {
 	Gauge(name string, v float64, tags [][2]string)
 }
 
+// RemovableReporter represents a stats reporter that handles removal.
+type RemovableReporter interface {
+	RemoveCounter(name string, tags [][2]string)
+	RemoveGauge(name string, tags [][2]string)
+}
+
 // HistogramReporter represents a stats reporter that handles histograms.
 type HistogramReporter interface {
 	Histogram(name string, tags [][2]string) func(v float64)
 }
 
+// RemovableHistogramReporter represents a stats reporter that handles histogram removal.
+type RemovableHistogramReporter interface {
+	RemoveHistogram(name string, tags [][2]string)
+}
+
 // TimingReporter represents a stats reporter that handles timings.
 type TimingReporter interface {
 	Timing(name string, tags [][2]string) func(v time.Duration)
+}
+
+// RemovableTimingReporter represents a stats reporter that handles timing removal.
+type RemovableTimingReporter interface {
+	RemoveTiming(name string, tags [][2]string)
 }
 
 // Tag is a stat tag.
@@ -157,6 +173,17 @@ func (s *Statter) FullName(name string) string {
 	return name
 }
 
+// HasCounter determines if the counter exists.
+func (s *Statter) HasCounter(name string, tags ...Tag) bool {
+	k := newKey(name, tags)
+
+	_, ok := s.counters.Load(k.String())
+
+	putKey(k)
+
+	return ok
+}
+
 // Counter returns a counter for the given name and tags.
 func (s *Statter) Counter(name string, tags ...Tag) *Counter {
 	k := newKey(name, tags)
@@ -165,8 +192,9 @@ func (s *Statter) Counter(name string, tags ...Tag) *Counter {
 	if !ok {
 		n, t := s.mergeDescriptors(name, tags)
 		counter := &Counter{
-			name: n,
-			tags: t,
+			name:     n,
+			tags:     t,
+			deleteFn: s.deleteCounterFunc(k.SafeString(), n, t),
 		}
 		c, _ = s.counters.LoadOrStore(k.SafeString(), counter)
 	}
@@ -174,6 +202,17 @@ func (s *Statter) Counter(name string, tags ...Tag) *Counter {
 	putKey(k)
 
 	return c
+}
+
+// HasGauge determines if the gauge exists.
+func (s *Statter) HasGauge(name string, tags ...Tag) bool {
+	k := newKey(name, tags)
+
+	_, ok := s.gauges.Load(k.String())
+
+	putKey(k)
+
+	return ok
 }
 
 // Gauge returns a gauge for the given name and tags.
@@ -184,8 +223,9 @@ func (s *Statter) Gauge(name string, tags ...Tag) *Gauge {
 	if !ok {
 		n, t := s.mergeDescriptors(name, tags)
 		gauge := &Gauge{
-			name: n,
-			tags: t,
+			name:     n,
+			tags:     t,
+			deleteFn: s.deleteGaugeFunc(k.SafeString(), n, t),
 		}
 		g, _ = s.gauges.LoadOrStore(k.SafeString(), gauge)
 	}
@@ -193,6 +233,17 @@ func (s *Statter) Gauge(name string, tags ...Tag) *Gauge {
 	putKey(k)
 
 	return g
+}
+
+// HasHistogram determines if the histogram exists.
+func (s *Statter) HasHistogram(name string, tags ...Tag) bool {
+	k := newKey(name, tags)
+
+	_, ok := s.histograms.Load(k.String())
+
+	putKey(k)
+
+	return ok
 }
 
 // Histogram returns a histogram for the given name and tags.
@@ -203,12 +254,24 @@ func (s *Statter) Histogram(name string, tags ...Tag) *Histogram {
 	if !ok {
 		n, t := s.mergeDescriptors(name, tags)
 		histogram := newHistogram(s.hr.Load(), n, t, s.pool)
+		histogram.deleteFn = s.deleteHistogramFunc(k.SafeString(), n, t)
 		h, _ = s.histograms.LoadOrStore(k.SafeString(), histogram)
 	}
 
 	putKey(k)
 
 	return h
+}
+
+// HasTiming determines if the timing exists.
+func (s *Statter) HasTiming(name string, tags ...Tag) bool {
+	k := newKey(name, tags)
+
+	_, ok := s.timings.Load(k.String())
+
+	putKey(k)
+
+	return ok
 }
 
 // Timing returns a timing for the given name and tags.
@@ -219,6 +282,7 @@ func (s *Statter) Timing(name string, tags ...Tag) *Timing {
 	if !ok {
 		n, newTags := s.mergeDescriptors(name, tags)
 		timing := newTiming(s.tr.Load(), n, newTags, s.pool)
+		timing.deleteFn = s.deleteTimingFunc(k.SafeString(), n, newTags)
 		t, _ = s.timings.LoadOrStore(k.SafeString(), timing)
 	}
 
@@ -283,6 +347,70 @@ func (s *Statter) reportSample(name, suffix string, tags [][2]string, sample *st
 	}
 }
 
+func (s *Statter) sampleKeys(name, suffix string) []string {
+	prefix := name + "_"
+	keys := []string{
+		prefix + "count",
+		prefix + "sum" + suffix,
+		prefix + "mean" + suffix,
+		prefix + "stddev" + suffix,
+		prefix + "min" + suffix,
+		prefix + "max" + suffix,
+	}
+
+	for _, p := range s.cfg.percentiles {
+		keys = append(keys, prefix+strconv.FormatFloat(p, 'g', -1, 64)+"p"+suffix)
+	}
+
+	return keys
+}
+
+func (s *Statter) deleteCounterFunc(key, name string, tags [][2]string) func() {
+	return func() {
+		if rr, ok := s.r.(RemovableReporter); ok {
+			rr.RemoveCounter(name, tags)
+		}
+		_, _ = s.counters.LoadAndDelete(key)
+	}
+}
+
+func (s *Statter) deleteGaugeFunc(key, name string, tags [][2]string) func() {
+	return func() {
+		if rr, ok := s.r.(RemovableReporter); ok {
+			rr.RemoveGauge(name, tags)
+		}
+		_, _ = s.gauges.LoadAndDelete(key)
+	}
+}
+
+func (s *Statter) deleteHistogramFunc(key, name string, tags [][2]string) func() {
+	return func() {
+		if rtr, ok := s.r.(RemovableHistogramReporter); ok {
+			rtr.RemoveHistogram(name, tags)
+		} else if rr, ok := s.r.(RemovableReporter); ok {
+			keys := s.sampleKeys(name, "")
+			for _, k := range keys {
+				rr.RemoveGauge(k, tags)
+			}
+		}
+		_, _ = s.histograms.LoadAndDelete(key)
+	}
+}
+
+func (s *Statter) deleteTimingFunc(key, name string, tags [][2]string) func() {
+	return func() {
+		if rtr, ok := s.r.(RemovableTimingReporter); ok {
+			rtr.RemoveTiming(name, tags)
+		} else if rr, ok := s.r.(RemovableReporter); ok {
+			keys := s.sampleKeys(name, "")
+			for _, k := range keys {
+				rr.RemoveGauge(k, tags)
+			}
+		}
+		_, _ = s.timings.LoadAndDelete(key)
+	}
+}
+
 func (s *Statter) mergeDescriptors(name string, tags []Tag) (string, [][2]string) {
 	if s.prefix != "" {
 		name = s.prefix + s.cfg.separator + name
@@ -316,8 +444,9 @@ func (s *Statter) Close() error {
 
 // Counter implements a counter.
 type Counter struct {
-	name string
-	tags [][2]string
+	name     string
+	tags     [][2]string
+	deleteFn func()
 
 	val int64
 }
@@ -327,14 +456,20 @@ func (c *Counter) Inc(v int64) {
 	atomic.AddInt64(&c.val, v)
 }
 
+// Delete removes the counter.
+func (c *Counter) Delete() {
+	c.deleteFn()
+}
+
 func (c *Counter) value() int64 {
 	return atomic.SwapInt64(&c.val, 0)
 }
 
 // Gauge implements a gauge.
 type Gauge struct {
-	name string
-	tags [][2]string
+	name     string
+	tags     [][2]string
+	deleteFn func()
 
 	val uint64
 }
@@ -344,6 +479,11 @@ func (g *Gauge) Set(v float64) {
 	atomic.StoreUint64(&g.val, math.Float64bits(v))
 }
 
+// Delete remove the gauge.
+func (g *Gauge) Delete() {
+	g.deleteFn()
+}
+
 func (g *Gauge) value() float64 {
 	v := atomic.LoadUint64(&g.val)
 	return math.Float64frombits(v)
@@ -351,10 +491,11 @@ func (g *Gauge) value() float64 {
 
 // Histogram implements a histogram.
 type Histogram struct {
-	hrFn func(v float64)
-	name string
-	tags [][2]string
-	pool *stats.Pool
+	hrFn     func(v float64)
+	name     string
+	tags     [][2]string
+	deleteFn func()
+	pool     *stats.Pool
 
 	mu sync.Mutex
 	s  *stats.Sample
@@ -390,6 +531,11 @@ func (h *Histogram) Observe(v float64) {
 	h.mu.Unlock()
 }
 
+// Delete removes the histogram.
+func (h *Histogram) Delete() {
+	h.deleteFn()
+}
+
 func (h *Histogram) value() *stats.Sample {
 	h.mu.Lock()
 	s := h.s
@@ -401,10 +547,11 @@ func (h *Histogram) value() *stats.Sample {
 
 // Timing implements a timing.
 type Timing struct {
-	trFn func(v time.Duration)
-	name string
-	tags [][2]string
-	pool *stats.Pool
+	trFn     func(v time.Duration)
+	name     string
+	tags     [][2]string
+	deleteFn func()
+	pool     *stats.Pool
 
 	mu sync.Mutex
 	s  *stats.Sample
@@ -441,6 +588,11 @@ func (t *Timing) Observe(d time.Duration) {
 	t.mu.Lock()
 	t.s.Add(d.Seconds() * 1000)
 	t.mu.Unlock()
+}
+
+// Delete removes the timing.
+func (t *Timing) Delete() {
+	t.deleteFn()
 }
 
 func (t *Timing) value() *stats.Sample {
