@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/hamba/statter/v2/internal/stats"
+	"github.com/puzpuzpuz/xsync"
 )
 
 // DiscardReporter is a reporter that discards all stats.
@@ -118,10 +119,10 @@ type Statter struct {
 	prefix string
 	tags   []Tag
 
-	counters   counterMap
-	gauges     gaugeMap
-	histograms histogramMap
-	timings    timingMap
+	counters   *xsync.MapOf[string, *Counter]
+	gauges     *xsync.MapOf[string, *Gauge]
+	histograms *xsync.MapOf[string, *Histogram]
+	timings    *xsync.MapOf[string, *Timing]
 }
 
 // New returns a statter.
@@ -133,13 +134,17 @@ func New(r Reporter, interval time.Duration, opts ...Option) *Statter {
 	}
 
 	s := &Statter{
-		cfg:    cfg,
-		r:      r,
-		hr:     &value[HistogramReporter]{},
-		tr:     &value[TimingReporter]{},
-		pool:   stats.NewPool(cfg.percSamples),
-		prefix: cfg.prefix,
-		tags:   cfg.tags,
+		cfg:        cfg,
+		r:          r,
+		hr:         &value[HistogramReporter]{},
+		tr:         &value[TimingReporter]{},
+		pool:       stats.NewPool(cfg.percSamples),
+		prefix:     cfg.prefix,
+		tags:       cfg.tags,
+		counters:   xsync.NewMapOf[*Counter](),
+		gauges:     xsync.NewMapOf[*Gauge](),
+		histograms: xsync.NewMapOf[*Histogram](),
+		timings:    xsync.NewMapOf[*Timing](),
 	}
 	s.reg = newRegistry(s, interval)
 
