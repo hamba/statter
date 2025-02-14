@@ -52,6 +52,11 @@ func (m *VictoriaMetrics) Counter(name string, v int64, tags [][2]string) {
 	c.Add(int(v))
 }
 
+// RemoveCounter removes a counter.
+func (m *VictoriaMetrics) RemoveCounter(name string, tags [][2]string) {
+	m.removeMetric(name, tags)
+}
+
 type gauge struct {
 	val uint64
 }
@@ -92,6 +97,11 @@ func (m *VictoriaMetrics) Gauge(name string, v float64, tags [][2]string) {
 	g.Set(v)
 }
 
+// RemoveGauge removes a gauge.
+func (m *VictoriaMetrics) RemoveGauge(name string, tags [][2]string) {
+	m.removeMetric(name, tags)
+}
+
 func (m *VictoriaMetrics) setExistingGauge(key string, v float64) bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -116,6 +126,11 @@ func (m *VictoriaMetrics) Histogram(name string, tags [][2]string) func(v float6
 	}
 }
 
+// RemoveHistogram removes a histogram.
+func (m *VictoriaMetrics) RemoveHistogram(name string, tags [][2]string) {
+	m.removeMetric(name, tags)
+}
+
 // Timing reports a timing value as a histogram in seconds.
 func (m *VictoriaMetrics) Timing(name string, tags [][2]string) func(v time.Duration) {
 	lbls := formatTags(tags, m.fqn)
@@ -126,6 +141,18 @@ func (m *VictoriaMetrics) Timing(name string, tags [][2]string) func(v time.Dura
 	return func(v time.Duration) {
 		h.Update(float64(v) / float64(time.Second))
 	}
+}
+
+// RemoveTiming removes a timing.
+func (m *VictoriaMetrics) RemoveTiming(name string, tags [][2]string) {
+	m.removeMetric(name, tags)
+}
+
+func (m *VictoriaMetrics) removeMetric(name string, tags [][2]string) {
+	lbls := formatTags(tags, m.fqn)
+	key := createKey(name, lbls, m.fqn)
+
+	m.set.UnregisterMetric(key)
 }
 
 // Close closes the client and flushes buffered stats, if applicable.

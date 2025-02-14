@@ -86,6 +86,18 @@ func (p *Prometheus) Counter(name string, v int64, tags [][2]string) {
 	m.With(lbls).Add(float64(v))
 }
 
+// RemoveCounter removes the counter.
+func (p *Prometheus) RemoveCounter(name string, tags [][2]string) {
+	lblNames, lbls := formatTags(tags, p.fqn)
+	key := createKey(name, lblNames)
+
+	m, ok := p.counters.Load(key)
+	if !ok {
+		return
+	}
+	m.Delete(lbls)
+}
+
 // Gauge reports a gauge value.
 func (p *Prometheus) Gauge(name string, v float64, tags [][2]string) {
 	lblNames, lbls := formatTags(tags, p.fqn)
@@ -109,6 +121,18 @@ func (p *Prometheus) Gauge(name string, v float64, tags [][2]string) {
 	}
 
 	m.With(lbls).Set(v)
+}
+
+// RemoveGauge removes the gauge.
+func (p *Prometheus) RemoveGauge(name string, tags [][2]string) {
+	lblNames, lbls := formatTags(tags, p.fqn)
+	key := createKey(name, lblNames)
+
+	m, ok := p.gauges.Load(key)
+	if !ok {
+		return
+	}
+	m.Delete(lbls)
 }
 
 // Histogram reports a histogram value.
@@ -141,6 +165,18 @@ func (p *Prometheus) Histogram(name string, tags [][2]string) func(v float64) {
 	}
 }
 
+// RemoveHistogram removes the histogram.
+func (p *Prometheus) RemoveHistogram(name string, tags [][2]string) {
+	lblNames, lbls := formatTags(tags, p.fqn)
+	key := createKey(name, lblNames)
+
+	m, ok := p.histograms.Load(key)
+	if !ok {
+		return
+	}
+	m.Delete(lbls)
+}
+
 // Timing reports a timing value as a histogram in seconds.
 func (p *Prometheus) Timing(name string, tags [][2]string) func(v time.Duration) {
 	lblNames, lbls := formatTags(tags, p.fqn)
@@ -169,6 +205,18 @@ func (p *Prometheus) Timing(name string, tags [][2]string) func(v time.Duration)
 	return func(v time.Duration) {
 		o.Observe(v.Seconds())
 	}
+}
+
+// RemoveTiming removes the timing.
+func (p *Prometheus) RemoveTiming(name string, tags [][2]string) {
+	lblNames, lbls := formatTags(tags, p.fqn)
+	key := createKey(name, lblNames)
+
+	m, ok := p.timings.Load(key)
+	if !ok {
+		return
+	}
+	m.Delete(lbls)
 }
 
 func (p *Prometheus) getBuckets(name string) []float64 {

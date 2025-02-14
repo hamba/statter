@@ -108,6 +108,52 @@ func TestStatter_CounterReturnsIdenticalCounter(t *testing.T) {
 	assert.Same(t, c1, c2)
 }
 
+func TestStatter_HasCounter(t *testing.T) {
+	m := &mockSimpleReporter{}
+	m.On("Counter", "test", int64(2), [][2]string{{"tag", "test"}})
+
+	stats := statter.New(m, time.Second)
+	t.Cleanup(func() { _ = stats.Close() })
+	stats.Counter("test", tags.Str("tag", "test")).Inc(2)
+
+	gotExists := stats.HasCounter("test", tags.Str("tag", "test"))
+	gotNotExists := stats.HasCounter("other", tags.Str("tag", "test"))
+	gotNoTag := stats.HasCounter("test", tags.Str("other", "test"))
+
+	assert.True(t, gotExists)
+	assert.False(t, gotNotExists)
+	assert.False(t, gotNoTag)
+}
+
+func TestStatter_CounterDelete(t *testing.T) {
+	m := &mockSimpleReporter{}
+
+	stats := statter.New(m, time.Second)
+	stats.Counter("test", tags.Str("tag", "test")).Inc(2)
+
+	stats.Counter("test", tags.Str("tag", "test")).Delete()
+
+	err := stats.Close()
+	assert.NoError(t, err)
+
+	m.AssertExpectations(t)
+}
+
+func TestStatter_CounterComplexDelete(t *testing.T) {
+	m := &mockComplexReporter{}
+	m.On("RemoveCounter", "test", [][2]string{{"tag", "test"}})
+
+	stats := statter.New(m, time.Second)
+	stats.Counter("test", tags.Str("tag", "test")).Inc(2)
+
+	stats.Counter("test", tags.Str("tag", "test")).Delete()
+
+	err := stats.Close()
+	assert.NoError(t, err)
+
+	m.AssertExpectations(t)
+}
+
 func TestStatter_Gauge(t *testing.T) {
 	m := &mockSimpleReporter{}
 	m.On("Gauge", "test", 1.23, [][2]string{{"tag", "test"}})
@@ -131,6 +177,52 @@ func TestStatter_GaugeReturnsIdenticalCounter(t *testing.T) {
 	g2 := stats.Gauge("test", tags.Str("tag", "test"))
 
 	assert.Same(t, g1, g2)
+}
+
+func TestStatter_HasGauge(t *testing.T) {
+	m := &mockSimpleReporter{}
+	m.On("Gauge", "test", 1.23, [][2]string{{"tag", "test"}})
+
+	stats := statter.New(m, time.Second)
+	t.Cleanup(func() { _ = stats.Close() })
+	stats.Gauge("test", tags.Str("tag", "test")).Set(1.23)
+
+	gotExists := stats.HasGauge("test", tags.Str("tag", "test"))
+	gotNotExists := stats.HasGauge("other", tags.Str("tag", "test"))
+	gotNoTag := stats.HasGauge("test", tags.Str("other", "test"))
+
+	assert.True(t, gotExists)
+	assert.False(t, gotNotExists)
+	assert.False(t, gotNoTag)
+}
+
+func TestStatter_GaugeDelete(t *testing.T) {
+	m := &mockSimpleReporter{}
+
+	stats := statter.New(m, time.Second)
+	stats.Gauge("test", tags.Str("tag", "test")).Set(1.23)
+
+	stats.Gauge("test", tags.Str("tag", "test")).Delete()
+
+	err := stats.Close()
+	assert.NoError(t, err)
+
+	m.AssertExpectations(t)
+}
+
+func TestStatter_GaugeComplexDelete(t *testing.T) {
+	m := &mockComplexReporter{}
+	m.On("RemoveGauge", "test", [][2]string{{"tag", "test"}})
+
+	stats := statter.New(m, time.Second)
+	stats.Gauge("test", tags.Str("tag", "test")).Set(1.23)
+
+	stats.Gauge("test", tags.Str("tag", "test")).Delete()
+
+	err := stats.Close()
+	assert.NoError(t, err)
+
+	m.AssertExpectations(t)
 }
 
 func TestStatter_Histogram(t *testing.T) {
@@ -220,6 +312,61 @@ func TestStatter_HistogramReturnsIdenticalCounter(t *testing.T) {
 	h2 := stats.Histogram("test", tags.Str("tag", "test"))
 
 	assert.Same(t, h1, h2)
+}
+
+func TestStatter_HasHistogram(t *testing.T) {
+	m := &mockComplexReporter{}
+	m.On("Histogram", "test", [][2]string{{"tag", "test"}}).Return(func(v float64) {})
+
+	stats := statter.New(m, time.Second)
+	t.Cleanup(func() { _ = stats.Close() })
+	stats.Histogram("test", tags.Str("tag", "test")).Observe(10)
+
+	gotExists := stats.HasHistogram("test", tags.Str("tag", "test"))
+	gotNotExists := stats.HasHistogram("other", tags.Str("tag", "test"))
+	gotNoTag := stats.HasHistogram("test", tags.Str("other", "test"))
+
+	assert.True(t, gotExists)
+	assert.False(t, gotNotExists)
+	assert.False(t, gotNoTag)
+}
+
+func TestStatter_HistogramDelete(t *testing.T) {
+	m := &mockComplexReporter{}
+	m.On("Histogram", "test", [][2]string{{"tag", "test"}}).Return(func(v float64) {
+		assert.Equal(t, 10.0, v)
+	})
+	m.On("RemoveHistogram", "test", [][2]string{{"tag", "test"}})
+
+	stats := statter.New(m, time.Second)
+	stats.Histogram("test", tags.Str("tag", "test")).Observe(10)
+
+	stats.Histogram("test", tags.Str("tag", "test")).Delete()
+
+	err := stats.Close()
+	assert.NoError(t, err)
+
+	m.AssertExpectations(t)
+}
+
+func TestStatter_HistogramAggregatedDelete(t *testing.T) {
+	m := &mockSimpleReporter{}
+
+	values := []float64{10, 20, 10, 30, 20, 11, 12, 32, 45, 9, 5, 5, 5, 10, 23, 8}
+
+	stats := statter.New(m, time.Second)
+
+	h := stats.Histogram("test", tags.Str("tag", "test"))
+	for _, v := range values {
+		h.Observe(v)
+	}
+
+	h.Delete()
+
+	err := stats.Close()
+	assert.NoError(t, err)
+
+	m.AssertExpectations(t)
 }
 
 func TestStatter_Timing(t *testing.T) {
@@ -324,6 +471,61 @@ func TestStatter_TimingReturnsIdenticalCounter(t *testing.T) {
 	assert.Same(t, t1, t2)
 }
 
+func TestStatter_HasTiming(t *testing.T) {
+	m := &mockComplexReporter{}
+	m.On("Timing", "test", [][2]string{{"tag", "test"}}).Return(func(v time.Duration) {})
+
+	stats := statter.New(m, time.Second)
+	t.Cleanup(func() { _ = stats.Close() })
+	stats.Timing("test", tags.Str("tag", "test")).Observe(10 * time.Millisecond)
+
+	gotExists := stats.HasTiming("test", tags.Str("tag", "test"))
+	gotNotExists := stats.HasTiming("other", tags.Str("tag", "test"))
+	gotNoTag := stats.HasTiming("test", tags.Str("other", "test"))
+
+	assert.True(t, gotExists)
+	assert.False(t, gotNotExists)
+	assert.False(t, gotNoTag)
+}
+
+func TestStatter_TimingDelete(t *testing.T) {
+	m := &mockComplexReporter{}
+	m.On("Timing", "test", [][2]string{{"tag", "test"}}).Return(func(v time.Duration) {
+		assert.Equal(t, 10*time.Millisecond, v)
+	})
+	m.On("RemoveTiming", "test", [][2]string{{"tag", "test"}})
+
+	stats := statter.New(m, time.Second)
+	stats.Timing("test", tags.Str("tag", "test")).Observe(10 * time.Millisecond)
+
+	stats.Timing("test", tags.Str("tag", "test")).Delete()
+
+	err := stats.Close()
+	assert.NoError(t, err)
+
+	m.AssertExpectations(t)
+}
+
+func TestStatter_TimingAggregatedDelete(t *testing.T) {
+	m := &mockSimpleReporter{}
+
+	values := []int{10, 20, 10, 30, 20, 11, 12, 32, 45, 9, 5, 5, 5, 10, 23, 8}
+
+	stats := statter.New(m, time.Second)
+
+	timing := stats.Timing("test", tags.Str("tag", "test"))
+	for _, v := range values {
+		timing.Observe(time.Duration(v) * time.Millisecond)
+	}
+
+	timing.Delete()
+
+	err := stats.Close()
+	assert.NoError(t, err)
+
+	m.AssertExpectations(t)
+}
+
 func TestStatter_CloseFromSubStatterFails(t *testing.T) {
 	stats := statter.New(statter.DiscardReporter, time.Second).With("prefix", tags.Str("base", "val"))
 
@@ -362,8 +564,16 @@ func (r *mockComplexReporter) Counter(name string, v int64, tags [][2]string) {
 	_ = r.Called(name, v, tags)
 }
 
+func (r *mockComplexReporter) RemoveCounter(name string, tags [][2]string) {
+	_ = r.Called(name, tags)
+}
+
 func (r *mockComplexReporter) Gauge(name string, v float64, tags [][2]string) {
 	_ = r.Called(name, v, tags)
+}
+
+func (r *mockComplexReporter) RemoveGauge(name string, tags [][2]string) {
+	_ = r.Called(name, tags)
 }
 
 func (r *mockComplexReporter) Histogram(name string, tags [][2]string) func(v float64) {
@@ -376,6 +586,10 @@ func (r *mockComplexReporter) Histogram(name string, tags [][2]string) func(v fl
 	return ret.(func(v float64))
 }
 
+func (r *mockComplexReporter) RemoveHistogram(name string, tags [][2]string) {
+	_ = r.Called(name, tags)
+}
+
 func (r *mockComplexReporter) Timing(name string, tags [][2]string) func(v time.Duration) {
 	args := r.Called(name, tags)
 
@@ -384,6 +598,10 @@ func (r *mockComplexReporter) Timing(name string, tags [][2]string) func(v time.
 		return nil
 	}
 	return ret.(func(v time.Duration))
+}
+
+func (r *mockComplexReporter) RemoveTiming(name string, tags [][2]string) {
+	_ = r.Called(name, tags)
 }
 
 type waitingReporter struct {
