@@ -10,6 +10,7 @@ import (
 	"github.com/hamba/statter/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/puzpuzpuz/xsync"
 )
 
 // Option represents statsd option function.
@@ -29,13 +30,13 @@ type Prometheus struct {
 	fqn *fqn
 
 	defBuckets []float64
-	buckets    bucketMap
+	buckets    *xsync.MapOf[string, []float64]
 
 	reg        *prometheus.Registry
-	counters   counterMap
-	gauges     gaugeMap
-	histograms histogramMap
-	timings    histogramMap
+	counters   *xsync.MapOf[string, *prometheus.CounterVec]
+	gauges     *xsync.MapOf[string, *prometheus.GaugeVec]
+	histograms *xsync.MapOf[string, *prometheus.HistogramVec]
+	timings    *xsync.MapOf[string, *prometheus.HistogramVec]
 }
 
 // New returns a new prometheus reporter.
@@ -46,7 +47,12 @@ func New(namespace string, opts ...Option) *Prometheus {
 		namespace:  fqn.Format(namespace),
 		fqn:        fqn,
 		defBuckets: prometheus.DefBuckets,
+		buckets:    xsync.NewMapOf[[]float64](),
 		reg:        prometheus.NewRegistry(),
+		counters:   xsync.NewMapOf[*prometheus.CounterVec](),
+		gauges:     xsync.NewMapOf[*prometheus.GaugeVec](),
+		histograms: xsync.NewMapOf[*prometheus.HistogramVec](),
+		timings:    xsync.NewMapOf[*prometheus.HistogramVec](),
 	}
 
 	for _, opt := range opts {
