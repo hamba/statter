@@ -25,8 +25,11 @@ func TestNew(t *testing.T) {
 	t.Cleanup(func() { _ = p.Close() })
 
 	assert.Implements(t, (*statter.Reporter)(nil), p)
+	assert.Implements(t, (*statter.RemovableReporter)(nil), p)
 	assert.Implements(t, (*statter.HistogramReporter)(nil), p)
+	assert.Implements(t, (*statter.RemovableHistogramReporter)(nil), p)
 	assert.Implements(t, (*statter.TimingReporter)(nil), p)
+	assert.Implements(t, (*statter.RemovableTimingReporter)(nil), p)
 }
 
 func TestPrometheus_Counter(t *testing.T) {
@@ -42,6 +45,21 @@ func TestPrometheus_Counter(t *testing.T) {
 	assert.Contains(t, rr.Body.String(), "test_test_test{foo=\"bar\",test=\"test\"} 2")
 }
 
+func TestPrometheus_RemoveCounter(t *testing.T) {
+	p := prometheus.New("test.test")
+	t.Cleanup(func() { _ = p.Close() })
+
+	p.Counter("test", 2, [][2]string{{"test", "test"}, {"foo", "bar"}})
+
+	p.RemoveCounter("test", [][2]string{{"test", "test"}, {"foo", "bar"}})
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/metrics", nil)
+	p.Handler().ServeHTTP(rr, req)
+
+	assert.NotContains(t, rr.Body.String(), "test_test_test{foo=\"bar\",test=\"test\"} 2")
+}
+
 func TestPrometheus_Gauge(t *testing.T) {
 	p := prometheus.New("test.test")
 	t.Cleanup(func() { _ = p.Close() })
@@ -53,6 +71,21 @@ func TestPrometheus_Gauge(t *testing.T) {
 	p.Handler().ServeHTTP(rr, req)
 
 	assert.Contains(t, rr.Body.String(), "test_test_test{foo=\"bar\"} 2.1")
+}
+
+func TestPrometheus_RemoveGauge(t *testing.T) {
+	p := prometheus.New("test.test")
+	t.Cleanup(func() { _ = p.Close() })
+
+	p.Gauge("test", 2.1, [][2]string{{"foo", "bar"}})
+
+	p.RemoveGauge("test", [][2]string{{"foo", "bar"}})
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/metrics", nil)
+	p.Handler().ServeHTTP(rr, req)
+
+	assert.NotContains(t, rr.Body.String(), "test_test_test{foo=\"bar\"} 2.1")
 }
 
 func TestPrometheus_Histogram(t *testing.T) {
@@ -71,6 +104,24 @@ func TestPrometheus_Histogram(t *testing.T) {
 	assert.Contains(t, rr.Body.String(), "test_test_test_count{foo=\"bar\"} 1")
 }
 
+func TestPrometheus_RemoveHistogram(t *testing.T) {
+	p := prometheus.New("test.test", prometheus.WithBuckets([]float64{0.1, 1.0}))
+	t.Cleanup(func() { _ = p.Close() })
+
+	p.Histogram("test", [][2]string{{"foo", "bar"}})(0.0123)
+
+	p.RemoveHistogram("test", [][2]string{{"foo", "bar"}})
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/metrics", nil)
+	p.Handler().ServeHTTP(rr, req)
+
+	assert.NotContains(t, rr.Body.String(), "test_test_test_bucket{foo=\"bar\",le=\"0.1\"} 1")
+	assert.NotContains(t, rr.Body.String(), "test_test_test_bucket{foo=\"bar\",le=\"1\"} 1")
+	assert.NotContains(t, rr.Body.String(), "test_test_test_sum{foo=\"bar\"} 0.0123")
+	assert.NotContains(t, rr.Body.String(), "test_test_test_count{foo=\"bar\"} 1")
+}
+
 func TestPrometheus_Timing(t *testing.T) {
 	p := prometheus.New("test.test", prometheus.WithBuckets([]float64{0.1, 1.0}))
 	t.Cleanup(func() { _ = p.Close() })
@@ -85,6 +136,24 @@ func TestPrometheus_Timing(t *testing.T) {
 	assert.Contains(t, rr.Body.String(), "test_test_test_bucket{foo=\"bar\",le=\"1\"} 1")
 	assert.Contains(t, rr.Body.String(), "test_test_test_sum{foo=\"bar\"} 0.0012345")
 	assert.Contains(t, rr.Body.String(), "test_test_test_count{foo=\"bar\"} 1")
+}
+
+func TestPrometheus_RemoveTiming(t *testing.T) {
+	p := prometheus.New("test.test", prometheus.WithBuckets([]float64{0.1, 1.0}))
+	t.Cleanup(func() { _ = p.Close() })
+
+	p.Timing("test", [][2]string{{"foo", "bar"}})(1234500 * time.Nanosecond)
+
+	p.RemoveTiming("test", [][2]string{{"foo", "bar"}})
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/metrics", nil)
+	p.Handler().ServeHTTP(rr, req)
+
+	assert.NotContains(t, rr.Body.String(), "test_test_test_bucket{foo=\"bar\",le=\"0.1\"} 1")
+	assert.NotContains(t, rr.Body.String(), "test_test_test_bucket{foo=\"bar\",le=\"1\"} 1")
+	assert.NotContains(t, rr.Body.String(), "test_test_test_sum{foo=\"bar\"} 0.0012345")
+	assert.NotContains(t, rr.Body.String(), "test_test_test_count{foo=\"bar\"} 1")
 }
 
 func TestPrometheus_ConvertsLabels(t *testing.T) {
