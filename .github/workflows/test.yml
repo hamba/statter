@@ -34,9 +34,6 @@ jobs:
       - name: Run tests
         run: go test -covermode=count -coverprofile=cover.out ./...
 
-      - name: Sanitize Coverage Profile
-        run: cat cover.out | grep -v ".gen.go" > coverage.out
-
       - name: Convert coverage.out to coverage.lcov
         uses: jandelgado/gcov2lcov-action@v1
 
