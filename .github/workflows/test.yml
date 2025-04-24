@@ -30,7 +30,10 @@ jobs:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
 
       - name: Run tests
-        run: go test -covermode=count -coverprofile=coverage.out ./...
+        run: go test -covermode=count -coverprofile=cover.out ./...
+
+      - name: Sanitize Coverage Profile
+        run: cat cover.out | grep -v ".gen.go" > coverage.out
 
       - name: Convert coverage.out to coverage.lcov
         uses: jandelgado/gcov2lcov-action@v1

@@ -4,8 +4,6 @@ import (
 	"errors"
 	"sync"
 	"time"
-
-	"github.com/puzpuzpuz/xsync"
 )
 
 type registry struct {
@@ -77,18 +75,14 @@ func (r *registry) SubStatter(parent *Statter, prefix string, tags []Tag) *Statt
 	}
 
 	s := &Statter{
-		cfg:        parent.cfg,
-		reg:        r,
-		r:          parent.r,
-		hr:         parent.hr,
-		tr:         parent.tr,
-		pool:       parent.pool,
-		prefix:     name,
-		tags:       tags,
-		counters:   xsync.NewMapOf[*Counter](),
-		gauges:     xsync.NewMapOf[*Gauge](),
-		histograms: xsync.NewMapOf[*Histogram](),
-		timings:    xsync.NewMapOf[*Timing](),
+		cfg:    parent.cfg,
+		reg:    r,
+		r:      parent.r,
+		hr:     parent.hr,
+		tr:     parent.tr,
+		pool:   parent.pool,
+		prefix: name,
+		tags:   tags,
 	}
 	r.statters[k.SafeString()] = s
 
