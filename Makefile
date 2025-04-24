@@ -22,6 +22,14 @@ lint:
 	@golangci-lint run ./...
 .PHONY: lint
 
+# Generate Go files
+generate:
+	@echo "==> Generating"
+	@go install -modfile go.tools.mod github.com/a8m/syncmap
+	@go generate
+	@echo "==> Done"
+.PHONY: generate
+
 # Run benchmarks
 bench:
 	@go test -bench . ./...
