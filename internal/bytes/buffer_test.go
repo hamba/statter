@@ -15,19 +15,19 @@ func TestPool(t *testing.T) {
 	p := bytes.NewPool(512)
 
 	var wg sync.WaitGroup
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				buf := p.Get()
 				assert.Zero(t, buf.Len(), "Expected truncated Buffer")
 				assert.NotZero(t, buf.Cap(), "Expected non-zero capacity")
 
 				buf.WriteString(dummyData)
 
-				assert.Equal(t, buf.Len(), len(dummyData), "Expected Buffer to contain dummy data")
+				assert.Len(t, dummyData, buf.Len(), "Expected Buffer to contain dummy data")
 
 				p.Put(buf)
 			}

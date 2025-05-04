@@ -9,6 +9,7 @@ import (
 	"github.com/hamba/statter/v2/tags"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNew_HandlesOptions(t *testing.T) {
@@ -20,7 +21,7 @@ func TestNew_HandlesOptions(t *testing.T) {
 	stats.With("test").Counter("test", tags.Str("tag", "test")).Inc(2)
 
 	err := stats.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	m.AssertExpectations(t)
 }
@@ -55,7 +56,7 @@ func TestStatter_With(t *testing.T) {
 		Counter("test", tags.Str("tag", "test")).Inc(2)
 
 	err := stats.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	m.AssertExpectations(t)
 }
@@ -92,7 +93,7 @@ func TestStatter_Counter(t *testing.T) {
 	stats.Counter("test", tags.Str("tag", "test")).Inc(2)
 
 	err := stats.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	m.AssertExpectations(t)
 }
@@ -134,7 +135,7 @@ func TestStatter_CounterDelete(t *testing.T) {
 	stats.Counter("test", tags.Str("tag", "test")).Delete()
 
 	err := stats.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	m.AssertExpectations(t)
 }
@@ -149,7 +150,7 @@ func TestStatter_CounterComplexDelete(t *testing.T) {
 	stats.Counter("test", tags.Str("tag", "test")).Delete()
 
 	err := stats.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	m.AssertExpectations(t)
 }
@@ -163,7 +164,7 @@ func TestStatter_Gauge(t *testing.T) {
 	stats.Gauge("test", tags.Str("tag", "test")).Set(1.23)
 
 	err := stats.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	m.AssertExpectations(t)
 }
@@ -205,7 +206,7 @@ func TestStatter_GaugeDelete(t *testing.T) {
 	stats.Gauge("test", tags.Str("tag", "test")).Delete()
 
 	err := stats.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	m.AssertExpectations(t)
 }
@@ -220,7 +221,7 @@ func TestStatter_GaugeComplexDelete(t *testing.T) {
 	stats.Gauge("test", tags.Str("tag", "test")).Delete()
 
 	err := stats.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	m.AssertExpectations(t)
 }
@@ -236,7 +237,7 @@ func TestStatter_Histogram(t *testing.T) {
 	stats.Histogram("test", tags.Str("tag", "test")).Observe(10)
 
 	err := stats.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	m.AssertExpectations(t)
 }
@@ -262,7 +263,7 @@ func TestStatter_HistogramAggregated(t *testing.T) {
 	}
 
 	err := stats.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	m.AssertExpectations(t)
 }
@@ -298,7 +299,7 @@ func TestStatter_HistogramAggregatedSwapsSamples(t *testing.T) {
 	}
 
 	err := stats.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	m.AssertExpectations(t)
 }
@@ -316,7 +317,7 @@ func TestStatter_HistogramReturnsIdenticalCounter(t *testing.T) {
 
 func TestStatter_HasHistogram(t *testing.T) {
 	m := &mockComplexReporter{}
-	m.On("Histogram", "test", [][2]string{{"tag", "test"}}).Return(func(v float64) {})
+	m.On("Histogram", "test", [][2]string{{"tag", "test"}}).Return(func(float64) {})
 
 	stats := statter.New(m, time.Second)
 	t.Cleanup(func() { _ = stats.Close() })
@@ -344,7 +345,7 @@ func TestStatter_HistogramDelete(t *testing.T) {
 	stats.Histogram("test", tags.Str("tag", "test")).Delete()
 
 	err := stats.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	m.AssertExpectations(t)
 }
@@ -364,7 +365,7 @@ func TestStatter_HistogramAggregatedDelete(t *testing.T) {
 	h.Delete()
 
 	err := stats.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	m.AssertExpectations(t)
 }
@@ -380,7 +381,7 @@ func TestStatter_Timing(t *testing.T) {
 	stats.Timing("test", tags.Str("tag", "test")).Observe(10 * time.Millisecond)
 
 	err := stats.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	m.AssertExpectations(t)
 }
@@ -406,7 +407,7 @@ func TestStatter_TimingAggregated(t *testing.T) {
 	}
 
 	err := stats.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	m.AssertExpectations(t)
 }
@@ -442,7 +443,7 @@ func TestStatter_TimingAggregatedSwapsSamples(t *testing.T) {
 	}
 
 	err := stats.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	m.AssertExpectations(t)
 }
@@ -454,7 +455,7 @@ func TestStatter_AggregatedCallsNothingIfNoValues(t *testing.T) {
 	stats := statter.New(m, time.Second)
 
 	err := stats.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	m.AssertNotCalled(t, "Counter", mock.Anything)
 	m.AssertNotCalled(t, "Gauge", mock.Anything)
@@ -473,7 +474,7 @@ func TestStatter_TimingReturnsIdenticalCounter(t *testing.T) {
 
 func TestStatter_HasTiming(t *testing.T) {
 	m := &mockComplexReporter{}
-	m.On("Timing", "test", [][2]string{{"tag", "test"}}).Return(func(v time.Duration) {})
+	m.On("Timing", "test", [][2]string{{"tag", "test"}}).Return(func(time.Duration) {})
 
 	stats := statter.New(m, time.Second)
 	t.Cleanup(func() { _ = stats.Close() })
@@ -501,7 +502,7 @@ func TestStatter_TimingDelete(t *testing.T) {
 	stats.Timing("test", tags.Str("tag", "test")).Delete()
 
 	err := stats.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	m.AssertExpectations(t)
 }
@@ -521,7 +522,7 @@ func TestStatter_TimingAggregatedDelete(t *testing.T) {
 	timing.Delete()
 
 	err := stats.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	m.AssertExpectations(t)
 }
