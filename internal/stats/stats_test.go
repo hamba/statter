@@ -49,7 +49,6 @@ func TestSample(t *testing.T) {
 	assert.Equal(t, float64(0), s.Min())
 	assert.Equal(t, 2886.751331514372, s.StdDev())
 	assert.Equal(t, 8333333.25, s.Variance())
-
 }
 
 func TestSample_Single(t *testing.T) {
@@ -64,7 +63,6 @@ func TestSample_Single(t *testing.T) {
 	assert.Equal(t, 12.34, s.Min())
 	ps := []float64{12.34, 12.34, 12.34, 12.34, 12.34, 12.34}
 	assert.Equal(t, ps, s.Percentiles([]float64{-1, 0, 50, 90, 99.5, 100}))
-
 }
 
 func TestSample_Underflow(t *testing.T) {
@@ -82,7 +80,6 @@ func TestSample_Underflow(t *testing.T) {
 	assert.Equal(t, float64(5), s.Min())
 	ps := []float64{5, 5, 11, 32, 45, 45}
 	assert.Equal(t, ps, s.Percentiles([]float64{-1, 0, 50, 90, 99.5, 100}))
-
 }
 
 func BenchmarkSample(b *testing.B) {
