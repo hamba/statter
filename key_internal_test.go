@@ -7,13 +7,13 @@ import (
 )
 
 func TestKey(t *testing.T) {
-	tests := []struct {
-		name string
+	t.Parallel()
 
+	tests := []struct {
+		name    string
 		keyName string
 		keyTags []Tag
-
-		want string
+		want    string
 	}{
 		{
 			name:    "key with tags",
@@ -36,7 +36,6 @@ func TestKey(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 

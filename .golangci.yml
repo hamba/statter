@@ -1,6 +1,4 @@
 version: "2"
-run:
-  tests: false
 
 formatters:
   enable:
@@ -28,10 +26,13 @@ linters:
     - exhaustive
     - exhaustruct
     - forcetypeassert
+    - funcorder
     - gochecknoglobals
     - ireturn
     - mnd
     - nlreturn
+    - paralleltest
+    - testableexamples
     - varnamelen
     - wrapcheck
     - wsl
@@ -44,6 +45,9 @@ linters:
       excludes:
         - G103
         - G115
+    testifylint:
+      disable:
+        - float-compare
   exclusions:
     generated: lax
     rules:
@@ -53,3 +57,6 @@ linters:
       - linters:
           - lll
         path: generate.go
+      - linters:
+          - lll
+        path: _test\.go

@@ -101,6 +101,6 @@ func BenchmarkStatter_PrometheusTiming(b *testing.B) {
 
 type discardReporter struct{}
 
-func (r discardReporter) Counter(name string, v int64, tags [][2]string) {}
+func (r discardReporter) Counter(string, int64, [][2]string) {}
 
-func (r discardReporter) Gauge(name string, v float64, tags [][2]string) {}
+func (r discardReporter) Gauge(string, float64, [][2]string) {}

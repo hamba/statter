@@ -40,7 +40,7 @@ func TestNew_Defaults(t *testing.T) {
 func TestStatsd_Counter(t *testing.T) {
 	sender := statsdtest.NewRecordingSender()
 	client, err := statsd.NewClientWithSender(sender, "test", statsd.InfixComma)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	s := &Statsd{
 		client: client,
@@ -57,7 +57,7 @@ func TestStatsd_Counter(t *testing.T) {
 func TestStatsd_Gauge(t *testing.T) {
 	sender := statsdtest.NewRecordingSender()
 	client, err := statsd.NewClientWithSender(sender, "test", statsd.InfixComma)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	s := &Statsd{
 		client: client,

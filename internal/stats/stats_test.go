@@ -12,12 +12,12 @@ func TestPool(t *testing.T) {
 	p := stats.NewPool(1000)
 
 	var wg sync.WaitGroup
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				s := p.Get()
 
 				assert.Zero(t, s.Count())
@@ -38,7 +38,7 @@ func TestPool(t *testing.T) {
 func TestSample(t *testing.T) {
 	s := stats.NewSample(1000)
 
-	for i := 0; i < 1000*10; i++ {
+	for i := range 1000 * 10 {
 		s.Add(float64(i))
 	}
 
@@ -87,7 +87,7 @@ func BenchmarkSample(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		s.Add(12.34)
 	}
 }
