@@ -479,14 +479,18 @@ func (g *Gauge) Set(v float64) {
 	atomic.StoreUint64(&g.val, math.Float64bits(v))
 }
 
+// Inc increments the gauge by 1.
 func (g *Gauge) Inc() {
 	g.Add(1)
 }
 
+// Dec decrements the gauge by 1.
 func (g *Gauge) Dec() {
 	g.Add(-1)
 }
 
+// Add increases the gauge's value by the argument.
+// The operation is thread-safe.
 func (g *Gauge) Add(v float64) {
 	for {
 		oldBits := atomic.LoadUint64(&g.val)
@@ -497,6 +501,7 @@ func (g *Gauge) Add(v float64) {
 	}
 }
 
+// Sub subtracts the argument from the gauge's value.
 func (g *Gauge) Sub(v float64) {
 	g.Add(v * -1)
 }
