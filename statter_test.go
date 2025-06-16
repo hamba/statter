@@ -169,6 +169,36 @@ func TestStatter_Gauge(t *testing.T) {
 	m.AssertExpectations(t)
 }
 
+func TestStatter_GaugeAddSub(t *testing.T) {
+	m := &mockSimpleReporter{}
+	m.On("Gauge", "test", 0.0, [][2]string{{"tag", "test"}})
+
+	stats := statter.New(m, time.Second)
+
+	stats.Gauge("test", tags.Str("tag", "test")).Add(1.23)
+	stats.Gauge("test", tags.Str("tag", "test")).Sub(1.23)
+
+	err := stats.Close()
+	require.NoError(t, err)
+
+	m.AssertExpectations(t)
+}
+
+func TestStatter_GaugeIncDec(t *testing.T) {
+	m := &mockSimpleReporter{}
+	m.On("Gauge", "test", 0.0, [][2]string{{"tag", "test"}})
+
+	stats := statter.New(m, time.Second)
+
+	stats.Gauge("test", tags.Str("tag", "test")).Inc()
+	stats.Gauge("test", tags.Str("tag", "test")).Dec()
+
+	err := stats.Close()
+	require.NoError(t, err)
+
+	m.AssertExpectations(t)
+}
+
 func TestStatter_GaugeReturnsIdenticalCounter(t *testing.T) {
 	stats := statter.New(statter.DiscardReporter, time.Second)
 	t.Cleanup(func() { _ = stats.Close() })
