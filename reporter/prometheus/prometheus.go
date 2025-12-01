@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go4org/hashtriemap"
 	"github.com/hamba/statter/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -29,13 +30,13 @@ type Prometheus struct {
 	fqn *fqn
 
 	defBuckets []float64
-	buckets    bucketMap
+	buckets    hashtriemap.HashTrieMap[string, []float64]
 
 	reg        *prometheus.Registry
-	counters   counterMap
-	gauges     gaugeMap
-	histograms histogramMap
-	timings    histogramMap
+	counters   hashtriemap.HashTrieMap[string, *prometheus.CounterVec]
+	gauges     hashtriemap.HashTrieMap[string, *prometheus.GaugeVec]
+	histograms hashtriemap.HashTrieMap[string, *prometheus.HistogramVec]
+	timings    hashtriemap.HashTrieMap[string, *prometheus.HistogramVec]
 }
 
 // New returns a new prometheus reporter.

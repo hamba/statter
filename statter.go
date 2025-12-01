@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/go4org/hashtriemap"
 	"github.com/hamba/statter/v2/internal/stats"
 )
 
@@ -118,10 +119,10 @@ type Statter struct {
 	prefix string
 	tags   []Tag
 
-	counters   counterMap
-	gauges     gaugeMap
-	histograms histogramMap
-	timings    timingMap
+	counters   hashtriemap.HashTrieMap[string, *Counter]
+	gauges     hashtriemap.HashTrieMap[string, *Gauge]
+	histograms hashtriemap.HashTrieMap[string, *Histogram]
+	timings    hashtriemap.HashTrieMap[string, *Timing]
 }
 
 // New returns a statter.
