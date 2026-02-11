@@ -47,6 +47,14 @@ linters:
       excludes:
         - G103
         - G115
+    revive:
+      rules:
+        - name: var-naming
+          arguments:
+            - []
+            - []
+            - - skip-package-name-checks: true
+                skip-package-name-collision-with-go-std: true
     testifylint:
       disable:
         - float-compare

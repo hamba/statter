@@ -17,7 +17,7 @@ type Pool struct {
 // NewPool returns a pool.
 func NewPool(percLimit int) *Pool {
 	return &Pool{p: &sync.Pool{
-		New: func() interface{} {
+		New: func() any {
 			return NewSample(percLimit)
 		},
 	}}

@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/go4org/hashtriemap"
 	"github.com/hamba/statter/v2/internal/stats"
 )
 
@@ -118,10 +119,10 @@ type Statter struct {
 	prefix string
 	tags   []Tag
 
-	counters   counterMap
-	gauges     gaugeMap
-	histograms histogramMap
-	timings    timingMap
+	counters   hashtriemap.HashTrieMap[string, *Counter]
+	gauges     hashtriemap.HashTrieMap[string, *Gauge]
+	histograms hashtriemap.HashTrieMap[string, *Histogram]
+	timings    hashtriemap.HashTrieMap[string, *Timing]
 }
 
 // New returns a statter.
@@ -349,14 +350,13 @@ func (s *Statter) reportSample(name, suffix string, tags [][2]string, sample *st
 
 func (s *Statter) sampleKeys(name, suffix string) []string {
 	prefix := name + "_"
-	keys := []string{
-		prefix + "count",
-		prefix + "sum" + suffix,
-		prefix + "mean" + suffix,
-		prefix + "stddev" + suffix,
-		prefix + "min" + suffix,
-		prefix + "max" + suffix,
-	}
+	keys := make([]string, 0, 6+len(s.cfg.percentiles))
+	keys = append(keys, prefix+"count")
+	keys = append(keys, prefix+"sum"+suffix)
+	keys = append(keys, prefix+"mean"+suffix)
+	keys = append(keys, prefix+"stddev"+suffix)
+	keys = append(keys, prefix+"min"+suffix)
+	keys = append(keys, prefix+"max"+suffix)
 
 	for _, p := range s.cfg.percentiles {
 		keys = append(keys, prefix+strconv.FormatFloat(p, 'g', -1, 64)+"p"+suffix)
