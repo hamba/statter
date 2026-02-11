@@ -15,7 +15,7 @@ type Pool struct {
 // NewPool creates a new instance of Pool.
 func NewPool(size int) Pool {
 	return Pool{p: &sync.Pool{
-		New: func() interface{} {
+		New: func() any {
 			return &Buffer{b: make([]byte, 0, size)}
 		},
 	}}

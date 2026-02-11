@@ -13,10 +13,7 @@ func TestPool(t *testing.T) {
 
 	var wg sync.WaitGroup
 	for range 10 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-
+		wg.Go(func() {
 			for range 100 {
 				s := p.Get()
 
@@ -29,7 +26,7 @@ func TestPool(t *testing.T) {
 
 				p.Put(s)
 			}
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -87,7 +84,7 @@ func BenchmarkSample(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for range b.N {
+	for b.Loop() {
 		s.Add(12.34)
 	}
 }

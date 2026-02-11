@@ -16,10 +16,7 @@ func TestPool(t *testing.T) {
 
 	var wg sync.WaitGroup
 	for range 10 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-
+		wg.Go(func() {
 			for range 100 {
 				buf := p.Get()
 				assert.Zero(t, buf.Len(), "Expected truncated Buffer")
@@ -31,7 +28,7 @@ func TestPool(t *testing.T) {
 
 				p.Put(buf)
 			}
-		}()
+		})
 	}
 
 	wg.Wait()
