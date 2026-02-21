@@ -9,7 +9,7 @@ jobs:
   test:
     strategy:
       matrix:
-        go-version: [ "1.25.7", "1.26" ]
+        go-version: [ "1.25", "1.26" ]
     runs-on: ubuntu-latest
     env:
       GOLANGCI_LINT_VERSION: v2.9.0
@@ -23,6 +23,7 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version: ${{ matrix.go-version }}
+          check-latest: true
 
       - name: Download dependencies
         run: go mod download
