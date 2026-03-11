@@ -39,7 +39,7 @@ func TestPrometheus_Counter(t *testing.T) {
 	p.Counter("test", 2, [][2]string{{"test", "test"}, {"foo", "bar"}})
 
 	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics", nil)
 	p.Handler().ServeHTTP(rr, req)
 
 	assert.Contains(t, rr.Body.String(), "test_test_test{foo=\"bar\",test=\"test\"} 2")
@@ -54,7 +54,7 @@ func TestPrometheus_RemoveCounter(t *testing.T) {
 	p.RemoveCounter("test", [][2]string{{"test", "test"}, {"foo", "bar"}})
 
 	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics", nil)
 	p.Handler().ServeHTTP(rr, req)
 
 	assert.NotContains(t, rr.Body.String(), "test_test_test{foo=\"bar\",test=\"test\"} 2")
@@ -67,7 +67,7 @@ func TestPrometheus_Gauge(t *testing.T) {
 	p.Gauge("test", 2.1, [][2]string{{"foo", "bar"}})
 
 	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics", nil)
 	p.Handler().ServeHTTP(rr, req)
 
 	assert.Contains(t, rr.Body.String(), "test_test_test{foo=\"bar\"} 2.1")
@@ -82,7 +82,7 @@ func TestPrometheus_RemoveGauge(t *testing.T) {
 	p.RemoveGauge("test", [][2]string{{"foo", "bar"}})
 
 	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics", nil)
 	p.Handler().ServeHTTP(rr, req)
 
 	assert.NotContains(t, rr.Body.String(), "test_test_test{foo=\"bar\"} 2.1")
@@ -95,7 +95,7 @@ func TestPrometheus_Histogram(t *testing.T) {
 	p.Histogram("test", [][2]string{{"foo", "bar"}})(0.0123)
 
 	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics", nil)
 	p.Handler().ServeHTTP(rr, req)
 
 	assert.Contains(t, rr.Body.String(), "test_test_test_bucket{foo=\"bar\",le=\"0.1\"} 1")
@@ -113,7 +113,7 @@ func TestPrometheus_RemoveHistogram(t *testing.T) {
 	p.RemoveHistogram("test", [][2]string{{"foo", "bar"}})
 
 	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics", nil)
 	p.Handler().ServeHTTP(rr, req)
 
 	assert.NotContains(t, rr.Body.String(), "test_test_test_bucket{foo=\"bar\",le=\"0.1\"} 1")
@@ -129,7 +129,7 @@ func TestPrometheus_Timing(t *testing.T) {
 	p.Timing("test", [][2]string{{"foo", "bar"}})(1234500 * time.Nanosecond)
 
 	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics", nil)
 	p.Handler().ServeHTTP(rr, req)
 
 	assert.Contains(t, rr.Body.String(), "test_test_test_bucket{foo=\"bar\",le=\"0.1\"} 1")
@@ -147,7 +147,7 @@ func TestPrometheus_RemoveTiming(t *testing.T) {
 	p.RemoveTiming("test", [][2]string{{"foo", "bar"}})
 
 	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics", nil)
 	p.Handler().ServeHTTP(rr, req)
 
 	assert.NotContains(t, rr.Body.String(), "test_test_test_bucket{foo=\"bar\",le=\"0.1\"} 1")
@@ -163,7 +163,7 @@ func TestPrometheus_ConvertsLabels(t *testing.T) {
 	p.Counter("test", 2, [][2]string{{"test-label", "test"}})
 
 	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics", nil)
 	p.Handler().ServeHTTP(rr, req)
 
 	assert.Contains(t, rr.Body.String(), "test_test_test{test_label=\"test\"} 2")
@@ -176,7 +176,7 @@ func TestPrometheus_NoPrefixNoTags(t *testing.T) {
 	p.Counter("test", 2, [][2]string{})
 
 	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics", nil)
 	p.Handler().ServeHTTP(rr, req)
 
 	assert.Contains(t, rr.Body.String(), "test 2")
@@ -199,8 +199,8 @@ func TestRegisterCounter(t *testing.T) {
 
 	p.Counter("baz.bat", 1, [][2]string{{"label1", "value1"}})
 
-	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
 	rec := httptest.NewRecorder()
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics", nil)
 	p.Handler().ServeHTTP(rec, req)
 
 	assert.Contains(t, rec.Body.String(), `HELP foo_bar_baz_bat my awesome counter`)
@@ -215,8 +215,8 @@ func TestRegisterGauge(t *testing.T) {
 
 	p.Gauge("baz.bat", 1.23, [][2]string{{"label1", "value1"}})
 
-	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
 	rec := httptest.NewRecorder()
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics", nil)
 	p.Handler().ServeHTTP(rec, req)
 
 	assert.Contains(t, rec.Body.String(), `HELP foo_bar_baz_bat my awesome gauge`)
@@ -231,8 +231,8 @@ func TestRegisterHistogram(t *testing.T) {
 
 	p.Histogram("baz.bat", [][2]string{{"label1", "value1"}})(0.0123)
 
-	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
 	rec := httptest.NewRecorder()
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics", nil)
 	p.Handler().ServeHTTP(rec, req)
 
 	assert.Contains(t, rec.Body.String(), `HELP foo_bar_baz_bat my awesome histogram`)
@@ -250,8 +250,8 @@ func TestRegisterHistogram_HandlesNoBuckets(t *testing.T) {
 
 	p.Histogram("baz.bat", [][2]string{{"label1", "value1"}})(0.0123)
 
-	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
 	rec := httptest.NewRecorder()
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics", nil)
 	p.Handler().ServeHTTP(rec, req)
 
 	assert.Contains(t, rec.Body.String(), `HELP foo_bar_baz_bat my awesome histogram`)
@@ -271,7 +271,7 @@ func TestSetBuckets_Histogram(t *testing.T) {
 	p.Histogram("test", [][2]string{{"foo", "bar"}})(0.0123)
 
 	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics", nil)
 	p.Handler().ServeHTTP(rr, req)
 
 	assert.Contains(t, rr.Body.String(), "test_test_test_bucket{foo=\"bar\",le=\"0.1\"} 1")
@@ -289,7 +289,7 @@ func TestSetBuckets_Timing(t *testing.T) {
 	p.Timing("test", [][2]string{{"foo", "bar"}})(1234500 * time.Nanosecond)
 
 	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics", nil)
 	p.Handler().ServeHTTP(rr, req)
 
 	assert.Contains(t, rr.Body.String(), "test_test_test_bucket{foo=\"bar\",le=\"0.1\"} 1")
