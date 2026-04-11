@@ -2,6 +2,7 @@
 package statsd
 
 import (
+	"sync"
 	"time"
 
 	"github.com/cactus/go-statsd-client/v5/statsd"
@@ -72,12 +73,24 @@ func New(addr, prefix string, opts ...Option) (*Statsd, error) {
 
 // Counter reports a counter value.
 func (s *Statsd) Counter(name string, v int64, tags [][2]string) {
-	_ = s.client.Inc(name, v, 1.0, toTags(tags)...)
+	if len(tags) == 0 {
+		_ = s.client.Inc(name, v, 1.0)
+		return
+	}
+	withTags(tags, func(t []statsd.Tag) {
+		_ = s.client.Inc(name, v, 1.0, t...)
+	})
 }
 
 // Gauge reports a gauge value.
 func (s *Statsd) Gauge(name string, v float64, tags [][2]string) {
-	_ = s.client.Gauge(name, int64(v), 1.0, toTags(tags)...)
+	if len(tags) == 0 {
+		_ = s.client.Gauge(name, int64(v), 1.0)
+		return
+	}
+	withTags(tags, func(t []statsd.Tag) {
+		_ = s.client.Gauge(name, int64(v), 1.0, t...)
+	})
 }
 
 // Close closes the client and flushes buffered stats, if applicable.
@@ -85,10 +98,25 @@ func (s *Statsd) Close() error {
 	return s.client.Close()
 }
 
-func toTags(t [][2]string) []statsd.Tag {
-	res := make([]statsd.Tag, len(t))
-	for i := range t {
-		res[i] = statsd.Tag{t[i][0], t[i][1]}
+var tagPool = sync.Pool{
+	New: func() any {
+		s := make([]statsd.Tag, 0, 8)
+		return &s
+	},
+}
+
+func withTags(tags [][2]string, fn func(t []statsd.Tag)) {
+	sp := tagPool.Get().(*[]statsd.Tag)
+	t := fillTags(*sp, tags)
+	*sp = t
+	fn(t)
+	tagPool.Put(sp)
+}
+
+func fillTags(dst []statsd.Tag, src [][2]string) []statsd.Tag {
+	dst = dst[:0]
+	for i := range src {
+		dst = append(dst, statsd.Tag{src[i][0], src[i][1]})
 	}
-	return res
+	return dst
 }
