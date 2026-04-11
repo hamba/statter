@@ -19,7 +19,7 @@ func Int(k string, v int) statter.Tag {
 
 // Int64 returns an int64 tag with the give key and value.
 func Int64(k string, v int64) statter.Tag {
-	return [2]string{k, strconv.Itoa(int(v))}
+	return [2]string{k, strconv.FormatInt(v, 10)}
 }
 
 // StatusCode return a tag with the given key and the status

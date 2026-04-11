@@ -2,6 +2,7 @@
 package runtime
 
 import (
+	"context"
 	"runtime"
 	"time"
 
@@ -12,16 +13,35 @@ import (
 var DefaultRuntimeInterval = 10 * time.Second
 
 // Collect collects runtime metrics periodically sending them to s.
+//
+// Collect blocks until the process exits. To stop collection, use
+// CollectWithContext instead.
 func Collect(s *statter.Statter) {
-	CollectEvery(s, DefaultRuntimeInterval)
+	CollectWithContext(context.Background(), s, DefaultRuntimeInterval)
 }
 
 // CollectEvery collects runtime metrics at interval d sending them to s.
+//
+// CollectEvery blocks until the process exits. To stop collection, use
+// CollectWithContext instead.
 func CollectEvery(s *statter.Statter, d time.Duration) {
-	c := time.Tick(d)
-	for range c {
-		r := newRuntimeStats()
-		r.send(s)
+	CollectWithContext(context.Background(), s, d)
+}
+
+// CollectWithContext collects runtime metrics at interval d sending them to s,
+// stopping when ctx is done.
+func CollectWithContext(ctx context.Context, s *statter.Statter, d time.Duration) {
+	tick := time.NewTicker(d)
+	defer tick.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick.C:
+			r := newRuntimeStats()
+			r.send(s)
+		}
 	}
 }
 

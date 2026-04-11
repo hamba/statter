@@ -402,7 +402,7 @@ func (s *Statter) deleteTimingFunc(key, name string, tags [][2]string) func() {
 		if rtr, ok := s.r.(RemovableTimingReporter); ok {
 			rtr.RemoveTiming(name, tags)
 		} else if rr, ok := s.r.(RemovableReporter); ok {
-			keys := s.sampleKeys(name, "")
+			keys := s.sampleKeys(name, "_ms")
 			for _, k := range keys {
 				rr.RemoveGauge(k, tags)
 			}
