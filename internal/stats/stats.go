@@ -52,7 +52,8 @@ type Sample struct {
 	ex  float64
 	ex2 float64
 
-	perc []float64
+	perc    []float64
+	scratch []float64
 
 	rng fastrand.RNG
 }
@@ -103,6 +104,7 @@ func (s *Sample) Reset() {
 	s.ex = 0
 	s.ex2 = 0
 	s.perc = s.perc[:0]
+	s.scratch = s.scratch[:0]
 }
 
 // Mean returns the mean of the sample.
@@ -141,14 +143,17 @@ func (s *Sample) Count() int64 {
 }
 
 // Percentiles returns the estimated percentiles of the sample.
+//
+// The returned slice is backed by internal storage and is only valid
+// until the next call to Percentiles or Reset on this Sample.
 func (s *Sample) Percentiles(ns []float64) []float64 {
 	sort.Float64s(s.perc)
 
-	p := make([]float64, len(ns))
-	for i, n := range ns {
-		p[i] = s.percentile(n)
+	s.scratch = s.scratch[:0]
+	for _, n := range ns {
+		s.scratch = append(s.scratch, s.percentile(n))
 	}
-	return p
+	return s.scratch
 }
 
 func (s *Sample) percentile(n float64) float64 {
