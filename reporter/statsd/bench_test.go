@@ -20,6 +20,9 @@ func BenchmarkCounter(b *testing.B) {
 		b.Fatal(err)
 	}
 	s := &Statsd{client: client}
+	if es, ok := client.(statsd.ExtendedStatSender); ok {
+		s.es = es
+	}
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -37,6 +40,9 @@ func BenchmarkGauge(b *testing.B) {
 		b.Fatal(err)
 	}
 	s := &Statsd{client: client}
+	if es, ok := client.(statsd.ExtendedStatSender); ok {
+		s.es = es
+	}
 
 	b.ReportAllocs()
 	b.ResetTimer()

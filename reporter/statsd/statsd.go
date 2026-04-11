@@ -2,6 +2,7 @@
 package statsd
 
 import (
+	"math"
 	"sync"
 	"time"
 
@@ -43,6 +44,7 @@ func WithFlushBytes(bytes int) Option {
 type Statsd struct {
 	cfg    config
 	client statsd.Statter
+	es     statsd.ExtendedStatSender
 }
 
 // New returns a statsd reporter.
@@ -65,10 +67,14 @@ func New(addr, prefix string, opts ...Option) (*Statsd, error) {
 		return nil, err
 	}
 
-	return &Statsd{
+	s := &Statsd{
 		cfg:    cfg,
 		client: c,
-	}, nil
+	}
+	if es, ok := c.(statsd.ExtendedStatSender); ok {
+		s.es = es
+	}
+	return s, nil
 }
 
 // Counter reports a counter value.
@@ -83,13 +89,25 @@ func (s *Statsd) Counter(name string, v int64, tags [][2]string) {
 }
 
 // Gauge reports a gauge value.
+//
+// If the underlying statsd client supports float gauges (ExtendedStatSender),
+// the full float64 value is sent. Otherwise the value is rounded to the
+// nearest integer rather than silently truncated.
 func (s *Statsd) Gauge(name string, v float64, tags [][2]string) {
 	if len(tags) == 0 {
-		_ = s.client.Gauge(name, int64(v), 1.0)
+		if s.es != nil {
+			_ = s.es.GaugeFloat(name, v, 1.0)
+		} else {
+			_ = s.client.Gauge(name, int64(math.Round(v)), 1.0)
+		}
 		return
 	}
 	withTags(tags, func(t []statsd.Tag) {
-		_ = s.client.Gauge(name, int64(v), 1.0, t...)
+		if s.es != nil {
+			_ = s.es.GaugeFloat(name, v, 1.0, t...)
+		} else {
+			_ = s.client.Gauge(name, int64(math.Round(v)), 1.0, t...)
+		}
 	})
 }
 
