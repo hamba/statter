@@ -448,12 +448,12 @@ type Counter struct {
 	tags     [][2]string
 	deleteFn func()
 
-	val int64
+	val atomic.Int64
 }
 
 // Inc increments the counter.
 func (c *Counter) Inc(v int64) {
-	atomic.AddInt64(&c.val, v)
+	c.val.Add(v)
 }
 
 // Delete removes the counter.
@@ -462,7 +462,7 @@ func (c *Counter) Delete() {
 }
 
 func (c *Counter) value() int64 {
-	return atomic.SwapInt64(&c.val, 0)
+	return c.val.Swap(0)
 }
 
 // Gauge implements a gauge.
@@ -471,12 +471,12 @@ type Gauge struct {
 	tags     [][2]string
 	deleteFn func()
 
-	val uint64
+	val atomic.Uint64
 }
 
 // Set sets the gauge value.
 func (g *Gauge) Set(v float64) {
-	atomic.StoreUint64(&g.val, math.Float64bits(v))
+	g.val.Store(math.Float64bits(v))
 }
 
 // Inc increments the gauge by 1.
@@ -493,9 +493,9 @@ func (g *Gauge) Dec() {
 // The operation is thread-safe.
 func (g *Gauge) Add(v float64) {
 	for {
-		oldBits := atomic.LoadUint64(&g.val)
+		oldBits := g.val.Load()
 		newBits := math.Float64bits(math.Float64frombits(oldBits) + v)
-		if atomic.CompareAndSwapUint64(&g.val, oldBits, newBits) {
+		if g.val.CompareAndSwap(oldBits, newBits) {
 			return
 		}
 	}
@@ -512,7 +512,7 @@ func (g *Gauge) Delete() {
 }
 
 func (g *Gauge) value() float64 {
-	v := atomic.LoadUint64(&g.val)
+	v := g.val.Load()
 	return math.Float64frombits(v)
 }
 

@@ -88,4 +88,3 @@ func TestStatsd_Gauge_PreservesDecimals(t *testing.T) {
 	assert.Len(t, sent, 1)
 	assert.Equal(t, "1.5", sent[0].Value) // was "1" with int64 truncation
 }
-
