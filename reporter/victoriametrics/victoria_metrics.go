@@ -58,16 +58,16 @@ func (m *VictoriaMetrics) RemoveCounter(name string, tags [][2]string) {
 }
 
 type gauge struct {
-	val uint64
+	val atomic.Uint64
 }
 
 func (g *gauge) Get() float64 {
-	v := atomic.LoadUint64(&g.val)
+	v := g.val.Load()
 	return math.Float64frombits(v)
 }
 
 func (g *gauge) Set(v float64) {
-	atomic.StoreUint64(&g.val, math.Float64bits(v))
+	g.val.Store(math.Float64bits(v))
 }
 
 // Gauge reports a gauge value.

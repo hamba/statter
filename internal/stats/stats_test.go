@@ -88,3 +88,17 @@ func BenchmarkSample(b *testing.B) {
 		s.Add(12.34)
 	}
 }
+
+func BenchmarkPercentiles(b *testing.B) {
+	s := stats.NewSample(1000)
+	for i := range 100 {
+		s.Add(float64(i))
+	}
+	ns := []float64{10, 90}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		_ = s.Percentiles(ns)
+	}
+}

@@ -53,9 +53,13 @@ func (r *registry) runReportLoop(d time.Duration) {
 
 func (r *registry) report() {
 	r.mu.Lock()
-	defer r.mu.Unlock()
-
+	snapshot := make([]*Statter, 0, len(r.statters))
 	for _, s := range r.statters {
+		snapshot = append(snapshot, s)
+	}
+	r.mu.Unlock()
+
+	for _, s := range snapshot {
 		s.report()
 	}
 }

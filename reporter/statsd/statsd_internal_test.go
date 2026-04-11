@@ -59,8 +59,9 @@ func TestStatsd_Gauge(t *testing.T) {
 	client, err := statsd.NewClientWithSender(sender, "test", statsd.InfixComma)
 	require.NoError(t, err)
 
-	s := &Statsd{
-		client: client,
+	s := &Statsd{client: client}
+	if es, ok := client.(statsd.ExtendedStatSender); ok {
+		s.es = es
 	}
 
 	s.Gauge("test", 2.0, [][2]string{{"test", "test"}})
@@ -69,4 +70,21 @@ func TestStatsd_Gauge(t *testing.T) {
 	assert.Len(t, sent, 1)
 	assert.Equal(t, "test.test,test=test", sent[0].Stat)
 	assert.Equal(t, "2", sent[0].Value)
+}
+
+func TestStatsd_Gauge_PreservesDecimals(t *testing.T) {
+	sender := statsdtest.NewRecordingSender()
+	client, err := statsd.NewClientWithSender(sender, "test", statsd.InfixComma)
+	require.NoError(t, err)
+
+	s := &Statsd{client: client}
+	if es, ok := client.(statsd.ExtendedStatSender); ok {
+		s.es = es
+	}
+
+	s.Gauge("test", 1.5, [][2]string{{"test", "test"}})
+
+	sent := sender.GetSent()
+	assert.Len(t, sent, 1)
+	assert.Equal(t, "1.5", sent[0].Value) // was "1" with int64 truncation
 }
