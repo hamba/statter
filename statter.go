@@ -48,7 +48,7 @@ type RemovableTimingReporter interface {
 }
 
 // Tag is a stat tag.
-type Tag [2]string
+type Tag = [2]string
 
 type config struct {
 	prefix      string
@@ -417,9 +417,7 @@ func (s *Statter) mergeDescriptors(name string, tags []Tag) (string, [][2]string
 	}
 
 	newTags := make([][2]string, len(s.tags), len(s.tags)+len(tags))
-	for i, t := range s.tags {
-		newTags[i] = t
-	}
+	copy(newTags, s.tags)
 	for _, tag := range tags {
 		if i := tagIndex(newTags, tag[0]); i >= 0 {
 			newTags[i][1] = tag[1]
