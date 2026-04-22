@@ -116,9 +116,15 @@ func mergeDescriptors(prefix, sep, name string, baseTags, tags []Tag) (string, [
 		name = prefix
 	}
 
-	newTags := make([]Tag, 0, len(baseTags)+len(tags))
-	newTags = append(newTags, baseTags...)
-	newTags = append(newTags, tags...)
+	newTags := make([]Tag, len(baseTags), len(baseTags)+len(tags))
+	copy(newTags, baseTags)
+	for _, tag := range tags {
+		if i := tagIndex(newTags, tag[0]); i >= 0 {
+			newTags[i][1] = tag[1]
+			continue
+		}
+		newTags = append(newTags, tag)
+	}
 
 	return name, newTags
 }

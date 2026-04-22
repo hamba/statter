@@ -416,15 +416,28 @@ func (s *Statter) mergeDescriptors(name string, tags []Tag) (string, [][2]string
 		name = s.prefix + s.cfg.separator + name
 	}
 
-	newTags := make([][2]string, 0, len(s.tags)+len(tags))
-	for _, tag := range s.tags {
-		newTags = append(newTags, tag)
+	newTags := make([][2]string, len(s.tags), len(s.tags)+len(tags))
+	for i, t := range s.tags {
+		newTags[i] = t
 	}
 	for _, tag := range tags {
-		newTags = append(newTags, tag)
+		if i := tagIndex(newTags, tag[0]); i >= 0 {
+			newTags[i][1] = tag[1]
+		} else {
+			newTags = append(newTags, tag)
+		}
 	}
 
 	return name, newTags
+}
+
+func tagIndex[T ~[2]string](tags []T, key string) int {
+	for i, t := range tags {
+		if t[0] == key {
+			return i
+		}
+	}
+	return -1
 }
 
 // Close closes the statter and reporter.
