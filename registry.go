@@ -22,7 +22,7 @@ type registry struct {
 	histograms hashtriemap.HashTrieMap[string, *Histogram]
 	timings    hashtriemap.HashTrieMap[string, *Timing]
 
-	mu       sync.Mutex
+	mu       sync.RWMutex
 	root     *Statter
 	statters map[string]*Statter
 
@@ -161,19 +161,28 @@ func (r *registry) SubStatter(parent *Statter, prefix string, tags []Tag) *Statt
 	k := newKey(name, newTags)
 	defer putKey(k)
 
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
+	r.mu.RLock()
 	if s, ok := r.statters[k.String()]; ok {
+		r.mu.RUnlock()
 		return s
 	}
+	r.mu.RUnlock()
 
+	// Slow path: first time we have seen this sub-statter.
 	s := &Statter{
 		reg:    r,
 		prefix: name,
 		tags:   newTags,
 	}
+
+	r.mu.Lock()
+	// Re-check under write lock: another goroutine may have raced us here.
+	if existing, ok := r.statters[k.String()]; ok {
+		r.mu.Unlock()
+		return existing
+	}
 	r.statters[k.SafeString()] = s
+	r.mu.Unlock()
 
 	return s
 }
