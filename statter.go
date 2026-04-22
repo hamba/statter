@@ -3,12 +3,10 @@ package statter
 import (
 	"io"
 	"math"
-	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/go4org/hashtriemap"
 	"github.com/hamba/statter/v2/internal/stats"
 )
 
@@ -108,21 +106,9 @@ func WithPercentiles(p []float64) Option {
 
 // Statter collects and reports stats.
 type Statter struct {
-	cfg config
-	reg *registry
-
-	r    Reporter
-	hr   *value[HistogramReporter]
-	tr   *value[TimingReporter]
-	pool *stats.Pool
-
+	reg    *registry
 	prefix string
 	tags   []Tag
-
-	counters   hashtriemap.HashTrieMap[string, *Counter]
-	gauges     hashtriemap.HashTrieMap[string, *Gauge]
-	histograms hashtriemap.HashTrieMap[string, *Histogram]
-	timings    hashtriemap.HashTrieMap[string, *Timing]
 }
 
 // New returns a statter.
@@ -133,23 +119,17 @@ func New(r Reporter, interval time.Duration, opts ...Option) *Statter {
 		opt(&cfg)
 	}
 
+	// Sort initial tags once to maintain the sorted-base-tags invariant,
+	// enabling zero-alloc fast paths in mergeDescriptors.
+	if len(cfg.tags) > 1 {
+		sortTags(cfg.tags)
+	}
+
 	s := &Statter{
-		cfg:    cfg,
-		r:      r,
-		hr:     &value[HistogramReporter]{},
-		tr:     &value[TimingReporter]{},
-		pool:   stats.NewPool(cfg.percSamples),
 		prefix: cfg.prefix,
 		tags:   cfg.tags,
 	}
-	s.reg = newRegistry(s, interval)
-
-	if hr, ok := r.(HistogramReporter); ok {
-		s.hr.Store(hr)
-	}
-	if tr, ok := r.(TimingReporter); ok {
-		s.tr.Store(tr)
-	}
+	s.reg = newRegistry(s, r, interval, cfg)
 
 	return s
 }
@@ -163,42 +143,42 @@ func (s *Statter) With(prefix string, tags ...Tag) *Statter {
 //
 // The reporter should not be used directly.
 func (s *Statter) Reporter() Reporter {
-	return s.r
+	return s.reg.r
 }
 
 // FullName returns the full name with prefix for the given name.
 func (s *Statter) FullName(name string) string {
 	if s.prefix != "" {
-		return s.prefix + s.cfg.separator + name
+		return s.prefix + s.reg.cfg.separator + name
 	}
 	return name
 }
 
 // HasCounter determines if the counter exists.
 func (s *Statter) HasCounter(name string, tags ...Tag) bool {
-	k := newKey(name, tags)
+	n, t := s.mergeDescriptors(name, tags)
+	k := newKey(n, t)
 
-	_, ok := s.counters.Load(k.String())
+	_, ok := s.reg.counters.Load(k.String())
 
 	putKey(k)
-
 	return ok
 }
 
 // Counter returns a counter for the given name and tags.
 func (s *Statter) Counter(name string, tags ...Tag) *Counter {
-	k := newKey(name, tags)
+	n, t := s.mergeDescriptors(name, tags)
+	k := newKey(n, t)
 
-	c, ok := s.counters.Load(k.String())
+	c, ok := s.reg.counters.Load(k.String())
 	if !ok {
-		n, t := s.mergeDescriptors(name, tags)
 		counter := &Counter{
-			name:    n,
-			tags:    t,
-			key:     k.SafeString(),
-			statter: s,
+			name: n,
+			tags: t,
+			key:  k.String(),
+			reg:  s.reg,
 		}
-		c, _ = s.counters.LoadOrStore(k.String(), counter)
+		c, _ = s.reg.counters.LoadOrStore(k.String(), counter)
 	}
 
 	putKey(k)
@@ -208,9 +188,10 @@ func (s *Statter) Counter(name string, tags ...Tag) *Counter {
 
 // HasGauge determines if the gauge exists.
 func (s *Statter) HasGauge(name string, tags ...Tag) bool {
-	k := newKey(name, tags)
+	n, t := s.mergeDescriptors(name, tags)
+	k := newKey(n, t)
 
-	_, ok := s.gauges.Load(k.String())
+	_, ok := s.reg.gauges.Load(k.String())
 
 	putKey(k)
 
@@ -219,18 +200,18 @@ func (s *Statter) HasGauge(name string, tags ...Tag) bool {
 
 // Gauge returns a gauge for the given name and tags.
 func (s *Statter) Gauge(name string, tags ...Tag) *Gauge {
-	k := newKey(name, tags)
+	n, t := s.mergeDescriptors(name, tags)
+	k := newKey(n, t)
 
-	g, ok := s.gauges.Load(k.String())
+	g, ok := s.reg.gauges.Load(k.String())
 	if !ok {
-		n, t := s.mergeDescriptors(name, tags)
 		gauge := &Gauge{
-			name:    n,
-			tags:    t,
-			key:     k.SafeString(),
-			statter: s,
+			name: n,
+			tags: t,
+			key:  k.String(),
+			reg:  s.reg,
 		}
-		g, _ = s.gauges.LoadOrStore(k.String(), gauge)
+		g, _ = s.reg.gauges.LoadOrStore(k.String(), gauge)
 	}
 
 	putKey(k)
@@ -240,9 +221,10 @@ func (s *Statter) Gauge(name string, tags ...Tag) *Gauge {
 
 // HasHistogram determines if the histogram exists.
 func (s *Statter) HasHistogram(name string, tags ...Tag) bool {
-	k := newKey(name, tags)
+	n, t := s.mergeDescriptors(name, tags)
+	k := newKey(n, t)
 
-	_, ok := s.histograms.Load(k.String())
+	_, ok := s.reg.histograms.Load(k.String())
 
 	putKey(k)
 
@@ -251,15 +233,15 @@ func (s *Statter) HasHistogram(name string, tags ...Tag) bool {
 
 // Histogram returns a histogram for the given name and tags.
 func (s *Statter) Histogram(name string, tags ...Tag) *Histogram {
-	k := newKey(name, tags)
+	n, t := s.mergeDescriptors(name, tags)
+	k := newKey(n, t)
 
-	h, ok := s.histograms.Load(k.String())
+	h, ok := s.reg.histograms.Load(k.String())
 	if !ok {
-		n, t := s.mergeDescriptors(name, tags)
-		histogram := newHistogram(s.hr.Load(), n, t, s.pool)
+		histogram := newHistogram(s.reg.hr.Load(), n, t, s.reg.pool)
 		histogram.key = k.SafeString()
-		histogram.statter = s
-		h, _ = s.histograms.LoadOrStore(k.String(), histogram)
+		histogram.reg = s.reg
+		h, _ = s.reg.histograms.LoadOrStore(k.String(), histogram)
 	}
 
 	putKey(k)
@@ -269,9 +251,10 @@ func (s *Statter) Histogram(name string, tags ...Tag) *Histogram {
 
 // HasTiming determines if the timing exists.
 func (s *Statter) HasTiming(name string, tags ...Tag) bool {
-	k := newKey(name, tags)
+	n, t := s.mergeDescriptors(name, tags)
+	k := newKey(n, t)
 
-	_, ok := s.timings.Load(k.String())
+	_, ok := s.reg.timings.Load(k.String())
 
 	putKey(k)
 
@@ -280,15 +263,15 @@ func (s *Statter) HasTiming(name string, tags ...Tag) bool {
 
 // Timing returns a timing for the given name and tags.
 func (s *Statter) Timing(name string, tags ...Tag) *Timing {
-	k := newKey(name, tags)
+	n, tags := s.mergeDescriptors(name, tags)
+	k := newKey(n, tags)
 
-	t, ok := s.timings.Load(k.String())
+	t, ok := s.reg.timings.Load(k.String())
 	if !ok {
-		n, newTags := s.mergeDescriptors(name, tags)
-		timing := newTiming(s.tr.Load(), n, newTags, s.pool)
+		timing := newTiming(s.reg.tr.Load(), n, tags, s.reg.pool)
 		timing.key = k.SafeString()
-		timing.statter = s
-		t, _ = s.timings.LoadOrStore(k.String(), timing)
+		timing.reg = s.reg
+		t, _ = s.reg.timings.LoadOrStore(k.String(), timing)
 	}
 
 	putKey(k)
@@ -296,85 +279,32 @@ func (s *Statter) Timing(name string, tags ...Tag) *Timing {
 	return t
 }
 
-func (s *Statter) report() {
-	s.counters.Range(func(_ string, c *Counter) bool {
-		val := c.value()
-		if val == 0 {
-			return true
-		}
-		s.r.Counter(c.name, val, c.tags)
-		return true
-	})
-
-	s.gauges.Range(func(_ string, g *Gauge) bool {
-		s.r.Gauge(g.name, g.value(), g.tags)
-		return true
-	})
-
-	if s.hr.Load() == nil {
-		s.histograms.Range(func(_ string, h *Histogram) bool {
-			histo := h.value()
-			defer s.pool.Put(histo)
-
-			s.reportSample(h.name, "", h.tags, histo)
-			return true
-		})
-	}
-
-	if s.tr.Load() == nil {
-		s.timings.Range(func(_ string, t *Timing) bool {
-			timing := t.value()
-			defer s.pool.Put(timing)
-
-			s.reportSample(t.name, "_ms", t.tags, timing)
-			return true
-		})
-	}
-}
-
-func (s *Statter) reportSample(name, suffix string, tags [][2]string, sample *stats.Sample) {
-	if sample.Count() == 0 {
-		return
-	}
-
-	prefix := name + "_"
-	s.r.Counter(prefix+"count", sample.Count(), tags)
-	s.r.Gauge(prefix+"sum"+suffix, sample.Sum(), tags)
-	s.r.Gauge(prefix+"mean"+suffix, sample.Mean(), tags)
-	s.r.Gauge(prefix+"stddev"+suffix, sample.StdDev(), tags)
-	s.r.Gauge(prefix+"min"+suffix, sample.Min(), tags)
-	s.r.Gauge(prefix+"max"+suffix, sample.Max(), tags)
-	ps := s.cfg.percentiles
-	vs := sample.Percentiles(ps)
-	for i := range vs {
-		name := prefix + strconv.FormatFloat(ps[i], 'g', -1, 64) + "p" + suffix
-		s.r.Gauge(name, vs[i], tags)
-	}
-}
-
-func (s *Statter) sampleKeys(name, suffix string) []string {
-	prefix := name + "_"
-	keys := make([]string, 0, 6+len(s.cfg.percentiles))
-	keys = append(keys, prefix+"count")
-	keys = append(keys, prefix+"sum"+suffix)
-	keys = append(keys, prefix+"mean"+suffix)
-	keys = append(keys, prefix+"stddev"+suffix)
-	keys = append(keys, prefix+"min"+suffix)
-	keys = append(keys, prefix+"max"+suffix)
-
-	for _, p := range s.cfg.percentiles {
-		keys = append(keys, prefix+strconv.FormatFloat(p, 'g', -1, 64)+"p"+suffix)
-	}
-
-	return keys
-}
-
-func (s *Statter) mergeDescriptors(name string, tags []Tag) (string, [][2]string) {
+func (s *Statter) mergeDescriptors(name string, tags []Tag) (string, []Tag) {
 	if s.prefix != "" {
-		name = s.prefix + s.cfg.separator + name
+		name = s.prefix + s.reg.cfg.separator + name
 	}
 
-	newTags := make([][2]string, len(s.tags), len(s.tags)+len(tags))
+	// Fast path: no tags at all.
+	if len(s.tags) == 0 && len(tags) == 0 {
+		return name, nil
+	}
+
+	// Fast path: no base tags, single call-site tag — no key duplication possible.
+	// The variadic is a fresh slice per call; safe to return directly.
+	if len(s.tags) == 0 && len(tags) == 1 {
+		return name, tags
+	}
+
+	// Fast path: no call-site tags — return base tags directly.
+	// Safe because s.tags is pre-sorted (invariant) and immutable after statter
+	// creation. newKey calls sortTags which is a no-op read for sorted input.
+	if len(tags) == 0 {
+		return name, s.tags
+	}
+
+	// General path: merge base tags and call-site tags with deduplication.
+	// Also handles multiple call-site tags that may share the same key.
+	newTags := make([]Tag, len(s.tags), len(s.tags)+len(tags))
 	copy(newTags, s.tags)
 	for _, tag := range tags {
 		if i := tagIndex(newTags, tag[0]); i >= 0 {
@@ -402,7 +332,7 @@ func (s *Statter) Close() error {
 		return err
 	}
 
-	if c, ok := s.r.(io.Closer); ok {
+	if c, ok := s.reg.r.(io.Closer); ok {
 		if err := c.Close(); err != nil {
 			return err
 		}
@@ -413,10 +343,10 @@ func (s *Statter) Close() error {
 
 // Counter implements a counter.
 type Counter struct {
-	name    string
-	tags    [][2]string
-	key     string
-	statter *Statter
+	name string
+	tags [][2]string
+	key  string
+	reg  *registry
 
 	val atomic.Int64
 }
@@ -428,10 +358,10 @@ func (c *Counter) Inc(v int64) {
 
 // Delete removes the counter.
 func (c *Counter) Delete() {
-	if rr, ok := c.statter.r.(RemovableReporter); ok {
+	if rr, ok := c.reg.r.(RemovableReporter); ok {
 		rr.RemoveCounter(c.name, c.tags)
 	}
-	_, _ = c.statter.counters.LoadAndDelete(c.key)
+	_, _ = c.reg.counters.LoadAndDelete(c.key)
 }
 
 func (c *Counter) value() int64 {
@@ -440,10 +370,10 @@ func (c *Counter) value() int64 {
 
 // Gauge implements a gauge.
 type Gauge struct {
-	name    string
-	tags    [][2]string
-	key     string
-	statter *Statter
+	name string
+	tags [][2]string
+	key  string
+	reg  *registry
 
 	val atomic.Uint64
 }
@@ -482,10 +412,10 @@ func (g *Gauge) Sub(v float64) {
 
 // Delete remove the gauge.
 func (g *Gauge) Delete() {
-	if rr, ok := g.statter.r.(RemovableReporter); ok {
+	if rr, ok := g.reg.r.(RemovableReporter); ok {
 		rr.RemoveGauge(g.name, g.tags)
 	}
-	_, _ = g.statter.gauges.LoadAndDelete(g.key)
+	_, _ = g.reg.gauges.LoadAndDelete(g.key)
 }
 
 func (g *Gauge) value() float64 {
@@ -495,12 +425,12 @@ func (g *Gauge) value() float64 {
 
 // Histogram implements a histogram.
 type Histogram struct {
-	hrFn    func(v float64)
-	name    string
-	tags    [][2]string
-	key     string
-	statter *Statter
-	pool    *stats.Pool
+	hrFn func(v float64)
+	name string
+	tags [][2]string
+	key  string
+	reg  *registry
+	pool *stats.Pool
 
 	mu sync.Mutex
 	s  *stats.Sample
@@ -540,14 +470,14 @@ func (h *Histogram) Observe(v float64) {
 
 // Delete removes the histogram.
 func (h *Histogram) Delete() {
-	if rtr, ok := h.statter.r.(RemovableHistogramReporter); ok {
+	if rtr, ok := h.reg.r.(RemovableHistogramReporter); ok {
 		rtr.RemoveHistogram(h.name, h.tags)
-	} else if rr, ok := h.statter.r.(RemovableReporter); ok {
-		for _, k := range h.statter.sampleKeys(h.name, "") {
+	} else if rr, ok := h.reg.r.(RemovableReporter); ok {
+		for _, k := range h.reg.sampleKeys(h.name, "") {
 			rr.RemoveGauge(k, h.tags)
 		}
 	}
-	_, _ = h.statter.histograms.LoadAndDelete(h.key)
+	_, _ = h.reg.histograms.LoadAndDelete(h.key)
 }
 
 func (h *Histogram) value() *stats.Sample {
@@ -561,12 +491,12 @@ func (h *Histogram) value() *stats.Sample {
 
 // Timing implements a timing.
 type Timing struct {
-	trFn    func(v time.Duration)
-	name    string
-	tags    [][2]string
-	key     string
-	statter *Statter
-	pool    *stats.Pool
+	trFn func(v time.Duration)
+	name string
+	tags [][2]string
+	key  string
+	reg  *registry
+	pool *stats.Pool
 
 	mu sync.Mutex
 	s  *stats.Sample
@@ -609,14 +539,14 @@ func (t *Timing) Observe(d time.Duration) {
 
 // Delete removes the timing.
 func (t *Timing) Delete() {
-	if rtr, ok := t.statter.r.(RemovableTimingReporter); ok {
+	if rtr, ok := t.reg.r.(RemovableTimingReporter); ok {
 		rtr.RemoveTiming(t.name, t.tags)
-	} else if rr, ok := t.statter.r.(RemovableReporter); ok {
-		for _, k := range t.statter.sampleKeys(t.name, "_ms") {
+	} else if rr, ok := t.reg.r.(RemovableReporter); ok {
+		for _, k := range t.reg.sampleKeys(t.name, "_ms") {
 			rr.RemoveGauge(k, t.tags)
 		}
 	}
-	_, _ = t.statter.timings.LoadAndDelete(t.key)
+	_, _ = t.reg.timings.LoadAndDelete(t.key)
 }
 
 func (t *Timing) value() *stats.Sample {
