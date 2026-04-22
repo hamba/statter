@@ -84,6 +84,20 @@ func TestStatter_WithReturnsIdenticalStatter(t *testing.T) {
 	assert.Same(t, s1, s2)
 }
 
+func TestStatter_WithDuplicateTags(t *testing.T) {
+	m := &mockSimpleReporter{}
+	m.On("Counter", "prefix.test", int64(1), [][2]string{{"tag", "metric"}})
+
+	stats := statter.New(m, time.Second)
+
+	stats.With("prefix", tags.Str("tag", "base")).Counter("test", tags.Str("tag", "metric")).Inc(1)
+
+	err := stats.Close()
+	require.NoError(t, err)
+
+	m.AssertExpectations(t)
+}
+
 func TestStatter_Counter(t *testing.T) {
 	m := &mockSimpleReporter{}
 	m.On("Counter", "test", int64(2), [][2]string{{"tag", "test"}})
@@ -91,6 +105,20 @@ func TestStatter_Counter(t *testing.T) {
 	stats := statter.New(m, time.Second)
 
 	stats.Counter("test", tags.Str("tag", "test")).Inc(2)
+
+	err := stats.Close()
+	require.NoError(t, err)
+
+	m.AssertExpectations(t)
+}
+
+func TestStatter_CounterDuplicateTags(t *testing.T) {
+	m := &mockSimpleReporter{}
+	m.On("Counter", "test", int64(1), [][2]string{{"tag", "second"}})
+
+	stats := statter.New(m, time.Second)
+
+	stats.Counter("test", tags.Str("tag", "first"), tags.Str("tag", "second")).Inc(1)
 
 	err := stats.Close()
 	require.NoError(t, err)
