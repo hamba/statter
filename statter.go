@@ -193,11 +193,12 @@ func (s *Statter) Counter(name string, tags ...Tag) *Counter {
 	if !ok {
 		n, t := s.mergeDescriptors(name, tags)
 		counter := &Counter{
-			name:     n,
-			tags:     t,
-			deleteFn: s.deleteCounterFunc(k.SafeString(), n, t),
+			name:    n,
+			tags:    t,
+			key:     k.SafeString(),
+			statter: s,
 		}
-		c, _ = s.counters.LoadOrStore(k.SafeString(), counter)
+		c, _ = s.counters.LoadOrStore(k.String(), counter)
 	}
 
 	putKey(k)
@@ -224,11 +225,12 @@ func (s *Statter) Gauge(name string, tags ...Tag) *Gauge {
 	if !ok {
 		n, t := s.mergeDescriptors(name, tags)
 		gauge := &Gauge{
-			name:     n,
-			tags:     t,
-			deleteFn: s.deleteGaugeFunc(k.SafeString(), n, t),
+			name:    n,
+			tags:    t,
+			key:     k.SafeString(),
+			statter: s,
 		}
-		g, _ = s.gauges.LoadOrStore(k.SafeString(), gauge)
+		g, _ = s.gauges.LoadOrStore(k.String(), gauge)
 	}
 
 	putKey(k)
@@ -255,8 +257,9 @@ func (s *Statter) Histogram(name string, tags ...Tag) *Histogram {
 	if !ok {
 		n, t := s.mergeDescriptors(name, tags)
 		histogram := newHistogram(s.hr.Load(), n, t, s.pool)
-		histogram.deleteFn = s.deleteHistogramFunc(k.SafeString(), n, t)
-		h, _ = s.histograms.LoadOrStore(k.SafeString(), histogram)
+		histogram.key = k.SafeString()
+		histogram.statter = s
+		h, _ = s.histograms.LoadOrStore(k.String(), histogram)
 	}
 
 	putKey(k)
@@ -283,8 +286,9 @@ func (s *Statter) Timing(name string, tags ...Tag) *Timing {
 	if !ok {
 		n, newTags := s.mergeDescriptors(name, tags)
 		timing := newTiming(s.tr.Load(), n, newTags, s.pool)
-		timing.deleteFn = s.deleteTimingFunc(k.SafeString(), n, newTags)
-		t, _ = s.timings.LoadOrStore(k.SafeString(), timing)
+		timing.key = k.SafeString()
+		timing.statter = s
+		t, _ = s.timings.LoadOrStore(k.String(), timing)
 	}
 
 	putKey(k)
@@ -365,52 +369,6 @@ func (s *Statter) sampleKeys(name, suffix string) []string {
 	return keys
 }
 
-func (s *Statter) deleteCounterFunc(key, name string, tags [][2]string) func() {
-	return func() {
-		if rr, ok := s.r.(RemovableReporter); ok {
-			rr.RemoveCounter(name, tags)
-		}
-		_, _ = s.counters.LoadAndDelete(key)
-	}
-}
-
-func (s *Statter) deleteGaugeFunc(key, name string, tags [][2]string) func() {
-	return func() {
-		if rr, ok := s.r.(RemovableReporter); ok {
-			rr.RemoveGauge(name, tags)
-		}
-		_, _ = s.gauges.LoadAndDelete(key)
-	}
-}
-
-func (s *Statter) deleteHistogramFunc(key, name string, tags [][2]string) func() {
-	return func() {
-		if rtr, ok := s.r.(RemovableHistogramReporter); ok {
-			rtr.RemoveHistogram(name, tags)
-		} else if rr, ok := s.r.(RemovableReporter); ok {
-			keys := s.sampleKeys(name, "")
-			for _, k := range keys {
-				rr.RemoveGauge(k, tags)
-			}
-		}
-		_, _ = s.histograms.LoadAndDelete(key)
-	}
-}
-
-func (s *Statter) deleteTimingFunc(key, name string, tags [][2]string) func() {
-	return func() {
-		if rtr, ok := s.r.(RemovableTimingReporter); ok {
-			rtr.RemoveTiming(name, tags)
-		} else if rr, ok := s.r.(RemovableReporter); ok {
-			keys := s.sampleKeys(name, "_ms")
-			for _, k := range keys {
-				rr.RemoveGauge(k, tags)
-			}
-		}
-		_, _ = s.timings.LoadAndDelete(key)
-	}
-}
-
 func (s *Statter) mergeDescriptors(name string, tags []Tag) (string, [][2]string) {
 	if s.prefix != "" {
 		name = s.prefix + s.cfg.separator + name
@@ -455,9 +413,10 @@ func (s *Statter) Close() error {
 
 // Counter implements a counter.
 type Counter struct {
-	name     string
-	tags     [][2]string
-	deleteFn func()
+	name    string
+	tags    [][2]string
+	key     string
+	statter *Statter
 
 	val atomic.Int64
 }
@@ -469,7 +428,10 @@ func (c *Counter) Inc(v int64) {
 
 // Delete removes the counter.
 func (c *Counter) Delete() {
-	c.deleteFn()
+	if rr, ok := c.statter.r.(RemovableReporter); ok {
+		rr.RemoveCounter(c.name, c.tags)
+	}
+	_, _ = c.statter.counters.LoadAndDelete(c.key)
 }
 
 func (c *Counter) value() int64 {
@@ -478,9 +440,10 @@ func (c *Counter) value() int64 {
 
 // Gauge implements a gauge.
 type Gauge struct {
-	name     string
-	tags     [][2]string
-	deleteFn func()
+	name    string
+	tags    [][2]string
+	key     string
+	statter *Statter
 
 	val atomic.Uint64
 }
@@ -519,7 +482,10 @@ func (g *Gauge) Sub(v float64) {
 
 // Delete remove the gauge.
 func (g *Gauge) Delete() {
-	g.deleteFn()
+	if rr, ok := g.statter.r.(RemovableReporter); ok {
+		rr.RemoveGauge(g.name, g.tags)
+	}
+	_, _ = g.statter.gauges.LoadAndDelete(g.key)
 }
 
 func (g *Gauge) value() float64 {
@@ -529,11 +495,12 @@ func (g *Gauge) value() float64 {
 
 // Histogram implements a histogram.
 type Histogram struct {
-	hrFn     func(v float64)
-	name     string
-	tags     [][2]string
-	deleteFn func()
-	pool     *stats.Pool
+	hrFn    func(v float64)
+	name    string
+	tags    [][2]string
+	key     string
+	statter *Statter
+	pool    *stats.Pool
 
 	mu sync.Mutex
 	s  *stats.Sample
@@ -545,6 +512,8 @@ func newHistogram(hr HistogramReporter, name string, tags [][2]string, pool *sta
 		if fn != nil {
 			return &Histogram{
 				hrFn: fn,
+				name: name,
+				tags: tags,
 			}
 		}
 	}
@@ -571,7 +540,14 @@ func (h *Histogram) Observe(v float64) {
 
 // Delete removes the histogram.
 func (h *Histogram) Delete() {
-	h.deleteFn()
+	if rtr, ok := h.statter.r.(RemovableHistogramReporter); ok {
+		rtr.RemoveHistogram(h.name, h.tags)
+	} else if rr, ok := h.statter.r.(RemovableReporter); ok {
+		for _, k := range h.statter.sampleKeys(h.name, "") {
+			rr.RemoveGauge(k, h.tags)
+		}
+	}
+	_, _ = h.statter.histograms.LoadAndDelete(h.key)
 }
 
 func (h *Histogram) value() *stats.Sample {
@@ -585,11 +561,12 @@ func (h *Histogram) value() *stats.Sample {
 
 // Timing implements a timing.
 type Timing struct {
-	trFn     func(v time.Duration)
-	name     string
-	tags     [][2]string
-	deleteFn func()
-	pool     *stats.Pool
+	trFn    func(v time.Duration)
+	name    string
+	tags    [][2]string
+	key     string
+	statter *Statter
+	pool    *stats.Pool
 
 	mu sync.Mutex
 	s  *stats.Sample
@@ -601,6 +578,8 @@ func newTiming(tr TimingReporter, name string, tags [][2]string, pool *stats.Poo
 		if fn != nil {
 			return &Timing{
 				trFn: fn,
+				name: name,
+				tags: tags,
 			}
 		}
 	}
@@ -630,7 +609,14 @@ func (t *Timing) Observe(d time.Duration) {
 
 // Delete removes the timing.
 func (t *Timing) Delete() {
-	t.deleteFn()
+	if rtr, ok := t.statter.r.(RemovableTimingReporter); ok {
+		rtr.RemoveTiming(t.name, t.tags)
+	} else if rr, ok := t.statter.r.(RemovableReporter); ok {
+		for _, k := range t.statter.sampleKeys(t.name, "_ms") {
+			rr.RemoveGauge(k, t.tags)
+		}
+	}
+	_, _ = t.statter.timings.LoadAndDelete(t.key)
 }
 
 func (t *Timing) value() *stats.Sample {
