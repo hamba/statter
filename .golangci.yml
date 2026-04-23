@@ -47,6 +47,7 @@ linters:
       excludes:
         - G103
         - G115
+        - G404
     revive:
       rules:
         - name: var-naming

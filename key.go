@@ -32,7 +32,9 @@ func newKey(name string, tags []Tag) *key {
 	}
 
 	// The tags must be sorted to create a consistent key.
-	sortTags(tags)
+	if len(tags) > 1 {
+		sortTags(tags)
+	}
 
 	for _, tag := range tags {
 		k.b = append(k.b, keySep)
@@ -59,20 +61,23 @@ func (k *key) SafeString() string {
 	return string(k.b)
 }
 
-func putKey(k *key) {
+func (k *key) Release() {
 	keyPool.Put(k)
 }
 
 func sortTags(tags []Tag) {
-	var sorted bool
-	for !sorted {
-		sorted = true
-		lmo := len(tags) - 1
-		for i := range lmo {
-			if tags[i+1][0] < tags[i][0] {
-				tags[i+1], tags[i] = tags[i], tags[i+1]
-				sorted = false
+	n := len(tags)
+	for {
+		swapped := false
+		for i := 1; i < n; i++ {
+			if tags[i][0] < tags[i-1][0] {
+				tags[i], tags[i-1] = tags[i-1], tags[i]
+				swapped = true
 			}
 		}
+		if !swapped {
+			return
+		}
+		n-- // largest element is now at position n; no need to re-examine it
 	}
 }

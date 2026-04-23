@@ -1,4 +1,4 @@
-// Package statsd implements an statsd client.
+// Package statsd implements a statsd client.
 package statsd
 
 import (
@@ -21,7 +21,7 @@ func defaultConfig() config {
 	}
 }
 
-// Option represents statsd option function.
+// Option represents a statsd option function.
 type Option func(*config)
 
 // WithFlushInterval sets the maximum flushInterval for packet sending.
@@ -32,8 +32,8 @@ func WithFlushInterval(interval time.Duration) Option {
 	}
 }
 
-// WithFlushBytes sets the maximum udp packet size that will be sent.
-// Defaults to 1432 flushBytes.
+// WithFlushBytes sets the maximum UDP packet size in bytes that will be sent.
+// Defaults to 1432 bytes.
 func WithFlushBytes(bytes int) Option {
 	return func(c *config) {
 		c.flushBytes = bytes

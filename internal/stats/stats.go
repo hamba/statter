@@ -3,10 +3,9 @@ package stats
 
 import (
 	"math"
+	"math/rand/v2"
 	"sort"
 	"sync"
-
-	"github.com/valyala/fastrand"
 )
 
 // Pool is a pool of samples.
@@ -54,8 +53,6 @@ type Sample struct {
 
 	perc    []float64
 	scratch []float64
-
-	rng fastrand.RNG
 }
 
 // NewSample returns a sample with the given percentile
@@ -90,7 +87,7 @@ func (s *Sample) Add(v float64) {
 	l, c := len(s.perc), cap(s.perc)
 	if l < c {
 		s.perc = append(s.perc, v)
-	} else if n := int(s.rng.Uint32n(uint32(s.n))); n < l {
+	} else if n := int(rand.Uint32N(uint32(s.n))); n < l {
 		s.perc[n] = v
 	}
 }
