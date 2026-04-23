@@ -12,8 +12,8 @@ import (
 
 type registry struct {
 	r    Reporter
-	hr   *value[HistogramReporter]
-	tr   *value[TimingReporter]
+	hr   HistogramReporter
+	tr   TimingReporter
 	pool *stats.Pool
 	cfg  config
 
@@ -33,8 +33,6 @@ type registry struct {
 func newRegistry(root *Statter, r Reporter, interval time.Duration, cfg config) *registry {
 	reg := &registry{
 		r:        r,
-		hr:       &value[HistogramReporter]{},
-		tr:       &value[TimingReporter]{},
 		pool:     stats.NewPool(cfg.percSamples),
 		cfg:      cfg,
 		root:     root,
@@ -43,10 +41,10 @@ func newRegistry(root *Statter, r Reporter, interval time.Duration, cfg config) 
 	}
 
 	if hr, ok := r.(HistogramReporter); ok {
-		reg.hr.Store(hr)
+		reg.hr = hr
 	}
 	if tr, ok := r.(TimingReporter); ok {
-		reg.tr.Store(tr)
+		reg.tr = tr
 	}
 
 	// Register root statter in the deduplication cache.
@@ -92,7 +90,7 @@ func (r *registry) report() {
 		return true
 	})
 
-	if r.hr.Load() == nil {
+	if r.hr == nil {
 		r.histograms.Range(func(_ string, h *Histogram) bool {
 			histo := h.value()
 			defer r.pool.Put(histo)
@@ -101,7 +99,7 @@ func (r *registry) report() {
 		})
 	}
 
-	if r.tr.Load() == nil {
+	if r.tr == nil {
 		r.timings.Range(func(_ string, t *Timing) bool {
 			timing := t.value()
 			defer r.pool.Put(timing)

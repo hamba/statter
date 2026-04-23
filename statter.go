@@ -258,7 +258,7 @@ func (s *Statter) Histogram(name string, tags ...Tag) *Histogram {
 	h, ok := s.reg.histograms.Load(k.String())
 	if !ok {
 		n, t := s.mergeDescriptors(name, tags)
-		histogram := newHistogram(s.reg.hr.Load(), n, t, s.reg.pool)
+		histogram := newHistogram(s.reg.hr, n, t, s.reg.pool)
 		histogram.key = k.SafeString()
 		histogram.reg = s.reg
 		h, _ = s.reg.histograms.LoadOrStore(k.SafeString(), histogram)
@@ -295,7 +295,7 @@ func (s *Statter) Timing(name string, tags ...Tag) *Timing {
 	t, ok := s.reg.timings.Load(k.String())
 	if !ok {
 		n, tags := s.mergeDescriptors(name, tags)
-		timing := newTiming(s.reg.tr.Load(), n, tags, s.reg.pool)
+		timing := newTiming(s.reg.tr, n, tags, s.reg.pool)
 		timing.key = k.SafeString()
 		timing.reg = s.reg
 		t, _ = s.reg.timings.LoadOrStore(k.SafeString(), timing)
@@ -582,21 +582,4 @@ func (r discardReporter) Histogram(_ string, _ [][2]string) func(float64) {
 
 func (r discardReporter) Timing(_ string, _ [][2]string) func(time.Duration) {
 	return func(_ time.Duration) {}
-}
-
-type value[T any] struct {
-	val atomic.Value
-}
-
-func (v *value[T]) Load() T {
-	var zeroT T
-	val, ok := v.val.Load().(T)
-	if !ok {
-		return zeroT
-	}
-	return val
-}
-
-func (v *value[T]) Store(t T) {
-	v.val.Store(t)
 }
