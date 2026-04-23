@@ -1,4 +1,4 @@
-// Package prometheus implements an prometheus stats client.
+// Package prometheus implements a prometheus stats client.
 package prometheus
 
 import (
@@ -13,10 +13,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-// Option represents statsd option function.
+// Option represents a prometheus option function.
 type Option func(p *Prometheus)
 
-// WithBuckets sets the buckets to used with histograms.
+// WithBuckets sets the buckets to use with histograms.
 func WithBuckets(buckets []float64) Option {
 	return func(p *Prometheus) {
 		p.defBuckets = buckets
@@ -57,7 +57,7 @@ func New(namespace string, opts ...Option) *Prometheus {
 	return p
 }
 
-// Handler gets the prometheus HTTP handler.
+// Handler returns the prometheus HTTP handler for scraping metrics.
 func (p *Prometheus) Handler() http.Handler {
 	return promhttp.HandlerFor(p.reg, promhttp.HandlerOpts{})
 }

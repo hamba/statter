@@ -1,4 +1,4 @@
-// Package l2met implements an l2met stats client.
+// Package l2met implements a l2met stats client.
 package l2met
 
 import (

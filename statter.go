@@ -111,7 +111,9 @@ type Statter struct {
 	tags   []Tag
 }
 
-// New returns a statter.
+// New returns a Statter that aggregates stats and flushes them to r on every
+// interval tick. Options may be used to set an initial prefix, tags, key
+// separator, and percentile configuration.
 func New(r Reporter, interval time.Duration, opts ...Option) *Statter {
 	cfg := defaultConfig()
 
@@ -134,14 +136,23 @@ func New(r Reporter, interval time.Duration, opts ...Option) *Statter {
 	return s
 }
 
-// With returns a statter with the given prefix and tags.
+// With returns a sub-statter whose metrics are prefixed with prefix and carry
+// the additional tags. The prefix is joined to the parent prefix with the
+// configured separator. Tags are merged with the parent tags; a call-site tag
+// whose key already exists in the parent overrides the parent value.
+//
+// Sub-statters with the same resolved prefix and tags are deduplicated: the
+// same instance is returned for repeated calls with identical arguments.
 func (s *Statter) With(prefix string, tags ...Tag) *Statter {
 	return s.reg.SubStatter(s, prefix, tags)
 }
 
-// Reporter returns the stats reporter.
+// Reporter returns the underlying stats reporter.
 //
-// The reporter should not be used directly.
+// The reporter is exposed for advanced use cases such as pre-registering
+// metrics with helpers like RegisterCounter, RegisterGauge, and
+// RegisterHistogram. Observing or mutating stats through the reporter
+// directly bypasses aggregation and should otherwise be avoided.
 func (s *Statter) Reporter() Reporter {
 	return s.reg.r
 }
@@ -165,7 +176,9 @@ func (s *Statter) HasCounter(name string, tags ...Tag) bool {
 	return ok
 }
 
-// Counter returns a counter for the given name and tags.
+// Counter returns a counter for the given name and tags. The counter is
+// created on the first call and the same instance is returned for subsequent
+// calls with identical name and tags.
 func (s *Statter) Counter(name string, tags ...Tag) *Counter {
 	n, t := s.mergeDescriptors(name, tags)
 	k := newKey(n, t)
@@ -198,7 +211,9 @@ func (s *Statter) HasGauge(name string, tags ...Tag) bool {
 	return ok
 }
 
-// Gauge returns a gauge for the given name and tags.
+// Gauge returns a gauge for the given name and tags. The gauge is created on
+// the first call and the same instance is returned for subsequent calls with
+// identical name and tags.
 func (s *Statter) Gauge(name string, tags ...Tag) *Gauge {
 	n, t := s.mergeDescriptors(name, tags)
 	k := newKey(n, t)
@@ -231,7 +246,14 @@ func (s *Statter) HasHistogram(name string, tags ...Tag) bool {
 	return ok
 }
 
-// Histogram returns a histogram for the given name and tags.
+// Histogram returns a histogram for the given name and tags. The histogram is
+// created on the first call and the same instance is returned for subsequent
+// calls with identical name and tags.
+//
+// When the reporter implements [HistogramReporter], observations are delegated
+// to it directly. Otherwise observations are aggregated locally and reported
+// each interval as a set of gauges (_sum, _mean, _stddev, _min, _max, and
+// each configured percentile) plus a _count counter.
 func (s *Statter) Histogram(name string, tags ...Tag) *Histogram {
 	n, t := s.mergeDescriptors(name, tags)
 	k := newKey(n, t)
@@ -261,7 +283,15 @@ func (s *Statter) HasTiming(name string, tags ...Tag) bool {
 	return ok
 }
 
-// Timing returns a timing for the given name and tags.
+// Timing returns a timing for the given name and tags. The timing is created
+// on the first call and the same instance is returned for subsequent calls
+// with identical name and tags.
+//
+// When the reporter implements [TimingReporter], observations are delegated
+// to it directly. Otherwise observations are aggregated locally in
+// milliseconds and reported each interval as a set of gauges
+// (_sum_ms, _mean_ms, _stddev_ms, _min_ms, _max_ms, and each configured
+// percentile) plus a _count counter.
 func (s *Statter) Timing(name string, tags ...Tag) *Timing {
 	n, tags := s.mergeDescriptors(name, tags)
 	k := newKey(n, tags)
@@ -326,7 +356,9 @@ func tagIndex[T ~[2]string](tags []T, key string) int {
 	return -1
 }
 
-// Close closes the statter and reporter.
+// Close stops the reporting loop, flushes any pending stats to the reporter,
+// and closes the reporter if it implements [io.Closer]. Close must be called
+// on the root statter; calling it on a sub-statter returns an error.
 func (s *Statter) Close() error {
 	if err := s.reg.Close(s); err != nil {
 		return err
@@ -341,7 +373,8 @@ func (s *Statter) Close() error {
 	return nil
 }
 
-// Counter implements a counter.
+// Counter implements a counter that monotonically accumulates a value between
+// flushes. The accumulated delta is reported and reset to zero on each flush.
 type Counter struct {
 	name string
 	tags [][2]string
@@ -351,7 +384,7 @@ type Counter struct {
 	val atomic.Int64
 }
 
-// Inc increments the counter.
+// Inc increments the counter by v.
 func (c *Counter) Inc(v int64) {
 	c.val.Add(v)
 }
@@ -368,7 +401,8 @@ func (c *Counter) value() int64 {
 	return c.val.Swap(0)
 }
 
-// Gauge implements a gauge.
+// Gauge implements a gauge that holds its last-set value and reports it on
+// each flush.
 type Gauge struct {
 	name string
 	tags [][2]string
@@ -393,8 +427,7 @@ func (g *Gauge) Dec() {
 	g.Add(-1)
 }
 
-// Add increases the gauge's value by the argument.
-// The operation is thread-safe.
+// Add increases the gauge's value by v.
 func (g *Gauge) Add(v float64) {
 	for {
 		oldBits := g.val.Load()
@@ -410,7 +443,7 @@ func (g *Gauge) Sub(v float64) {
 	g.Add(v * -1)
 }
 
-// Delete remove the gauge.
+// Delete removes the gauge.
 func (g *Gauge) Delete() {
 	if rr, ok := g.reg.r.(RemovableReporter); ok {
 		rr.RemoveGauge(g.name, g.tags)
@@ -424,6 +457,11 @@ func (g *Gauge) value() float64 {
 }
 
 // Histogram implements a histogram.
+//
+// When the reporter implements [HistogramReporter], observations are delegated
+// to it directly. Otherwise observations are aggregated locally and reported
+// each interval as a set of gauges (_sum, _mean, _stddev, _min, _max, and
+// each configured percentile) plus a _count counter.
 type Histogram struct {
 	hrFn func(v float64)
 	name string
@@ -490,6 +528,12 @@ func (h *Histogram) value() *stats.Sample {
 }
 
 // Timing implements a timing.
+//
+// When the reporter implements [TimingReporter], observations are delegated to
+// it directly. Otherwise observations are aggregated locally in milliseconds
+// and reported each interval as a set of gauges (_sum_ms, _mean_ms,
+// _stddev_ms, _min_ms, _max_ms, and each configured percentile) plus a
+// _count counter.
 type Timing struct {
 	trFn func(v time.Duration)
 	name string

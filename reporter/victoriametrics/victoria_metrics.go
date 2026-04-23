@@ -1,4 +1,4 @@
-// Package victoriametrics implements an victoria metrics stats reporter.
+// Package victoriametrics implements a VictoriaMetrics stats reporter.
 package victoriametrics
 
 import (
@@ -35,7 +35,7 @@ func New() *VictoriaMetrics {
 	}
 }
 
-// Handler gets the victoria metrics HTTP handler.
+// Handler returns the VictoriaMetrics HTTP handler for scraping metrics in Prometheus format.
 func (m *VictoriaMetrics) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		m.set.WritePrometheus(w)
