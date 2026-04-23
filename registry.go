@@ -52,7 +52,7 @@ func newRegistry(root *Statter, r Reporter, interval time.Duration, cfg config) 
 	// Register root statter in the deduplication cache.
 	k := newKey(root.prefix, root.tags)
 	reg.statters[k.SafeString()] = root
-	putKey(k)
+	k.Release()
 
 	reg.wg.Add(1)
 	go reg.runReportLoop(interval)
@@ -159,7 +159,7 @@ func (r *registry) SubStatter(parent *Statter, prefix string, tags []Tag) *Statt
 	}
 
 	k := newKey(name, newTags)
-	defer putKey(k)
+	defer k.Release()
 
 	r.mu.RLock()
 	if s, ok := r.statters[k.String()]; ok {
@@ -176,7 +176,6 @@ func (r *registry) SubStatter(parent *Statter, prefix string, tags []Tag) *Statt
 	}
 
 	r.mu.Lock()
-	// Re-check under write lock: another goroutine may have raced us here.
 	if existing, ok := r.statters[k.String()]; ok {
 		r.mu.Unlock()
 		return existing
@@ -212,13 +211,27 @@ func mergeDescriptors(prefix, sep, name string, baseTags, tags []Tag) (string, [
 
 	newTags := make([]Tag, len(baseTags), len(baseTags)+len(tags))
 	copy(newTags, baseTags)
-	for _, tag := range tags {
-		if i := tagIndex(newTags, tag[0]); i >= 0 {
-			newTags[i][1] = tag[1]
-			continue
-		}
-		newTags = append(newTags, tag)
-	}
+	newTags = mergeTags(newTags, tags)
 
 	return name, newTags
+}
+
+func mergeTags(out, tags []Tag) []Tag {
+	for _, tag := range tags {
+		if i := tagIndex(out, tag[0]); i >= 0 {
+			out[i][1] = tag[1]
+			continue
+		}
+		out = append(out, tag)
+	}
+	return out
+}
+
+func tagIndex[T ~[2]string](tags []T, key string) int {
+	for i, t := range tags {
+		if t[0] == key {
+			return i
+		}
+	}
+	return -1
 }

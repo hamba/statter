@@ -40,7 +40,7 @@ func TestKey(t *testing.T) {
 			t.Parallel()
 
 			k := newKey(test.keyName, test.keyTags)
-			defer putKey(k)
+			defer k.Release()
 
 			assert.Equal(t, test.want, k.String())
 		})
@@ -56,7 +56,7 @@ func BenchmarkKey(b *testing.B) {
 		for pb.Next() {
 			k := newKey("test", tags)
 
-			putKey(k)
+			k.Release()
 		}
 	})
 }

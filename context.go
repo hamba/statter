@@ -22,13 +22,7 @@ func WithContext(ctx context.Context, tags ...Tag) context.Context {
 	if existing != nil && len(existing.tags) > 0 {
 		merged = make([]Tag, len(existing.tags), len(existing.tags)+len(tags))
 		copy(merged, existing.tags)
-		for _, tag := range tags {
-			if i := tagIndex(merged, tag[0]); i >= 0 {
-				merged[i][1] = tag[1]
-			} else {
-				merged = append(merged, tag)
-			}
-		}
+		merged = mergeTags(merged, tags)
 	} else {
 		merged = make([]Tag, len(tags))
 		copy(merged, tags)

@@ -167,12 +167,12 @@ func (s *Statter) FullName(name string) string {
 
 // HasCounter determines if the counter exists.
 func (s *Statter) HasCounter(name string, tags ...Tag) bool {
-	n, t := s.mergeDescriptors(name, tags)
-	k := newKey(n, t)
+	k := s.key(name, tags)
 
 	_, ok := s.reg.counters.Load(k.String())
 
-	putKey(k)
+	k.Release()
+
 	return ok
 }
 
@@ -180,33 +180,32 @@ func (s *Statter) HasCounter(name string, tags ...Tag) bool {
 // created on the first call and the same instance is returned for subsequent
 // calls with identical name and tags.
 func (s *Statter) Counter(name string, tags ...Tag) *Counter {
-	n, t := s.mergeDescriptors(name, tags)
-	k := newKey(n, t)
+	k := s.key(name, tags)
 
 	c, ok := s.reg.counters.Load(k.String())
 	if !ok {
+		n, t := s.mergeDescriptors(name, tags)
 		counter := &Counter{
 			name: n,
 			tags: t,
-			key:  k.String(),
+			key:  k.SafeString(),
 			reg:  s.reg,
 		}
-		c, _ = s.reg.counters.LoadOrStore(k.String(), counter)
+		c, _ = s.reg.counters.LoadOrStore(k.SafeString(), counter)
 	}
 
-	putKey(k)
+	k.Release()
 
 	return c
 }
 
 // HasGauge determines if the gauge exists.
 func (s *Statter) HasGauge(name string, tags ...Tag) bool {
-	n, t := s.mergeDescriptors(name, tags)
-	k := newKey(n, t)
+	k := s.key(name, tags)
 
 	_, ok := s.reg.gauges.Load(k.String())
 
-	putKey(k)
+	k.Release()
 
 	return ok
 }
@@ -215,33 +214,32 @@ func (s *Statter) HasGauge(name string, tags ...Tag) bool {
 // the first call and the same instance is returned for subsequent calls with
 // identical name and tags.
 func (s *Statter) Gauge(name string, tags ...Tag) *Gauge {
-	n, t := s.mergeDescriptors(name, tags)
-	k := newKey(n, t)
+	k := s.key(name, tags)
 
 	g, ok := s.reg.gauges.Load(k.String())
 	if !ok {
+		n, t := s.mergeDescriptors(name, tags)
 		gauge := &Gauge{
 			name: n,
 			tags: t,
-			key:  k.String(),
+			key:  k.SafeString(),
 			reg:  s.reg,
 		}
-		g, _ = s.reg.gauges.LoadOrStore(k.String(), gauge)
+		g, _ = s.reg.gauges.LoadOrStore(k.SafeString(), gauge)
 	}
 
-	putKey(k)
+	k.Release()
 
 	return g
 }
 
 // HasHistogram determines if the histogram exists.
 func (s *Statter) HasHistogram(name string, tags ...Tag) bool {
-	n, t := s.mergeDescriptors(name, tags)
-	k := newKey(n, t)
+	k := s.key(name, tags)
 
 	_, ok := s.reg.histograms.Load(k.String())
 
-	putKey(k)
+	k.Release()
 
 	return ok
 }
@@ -255,30 +253,29 @@ func (s *Statter) HasHistogram(name string, tags ...Tag) bool {
 // each interval as a set of gauges (_sum, _mean, _stddev, _min, _max, and
 // each configured percentile) plus a _count counter.
 func (s *Statter) Histogram(name string, tags ...Tag) *Histogram {
-	n, t := s.mergeDescriptors(name, tags)
-	k := newKey(n, t)
+	k := s.key(name, tags)
 
 	h, ok := s.reg.histograms.Load(k.String())
 	if !ok {
+		n, t := s.mergeDescriptors(name, tags)
 		histogram := newHistogram(s.reg.hr.Load(), n, t, s.reg.pool)
 		histogram.key = k.SafeString()
 		histogram.reg = s.reg
-		h, _ = s.reg.histograms.LoadOrStore(k.String(), histogram)
+		h, _ = s.reg.histograms.LoadOrStore(k.SafeString(), histogram)
 	}
 
-	putKey(k)
+	k.Release()
 
 	return h
 }
 
 // HasTiming determines if the timing exists.
 func (s *Statter) HasTiming(name string, tags ...Tag) bool {
-	n, t := s.mergeDescriptors(name, tags)
-	k := newKey(n, t)
+	k := s.key(name, tags)
 
 	_, ok := s.reg.timings.Load(k.String())
 
-	putKey(k)
+	k.Release()
 
 	return ok
 }
@@ -293,67 +290,39 @@ func (s *Statter) HasTiming(name string, tags ...Tag) bool {
 // (_sum_ms, _mean_ms, _stddev_ms, _min_ms, _max_ms, and each configured
 // percentile) plus a _count counter.
 func (s *Statter) Timing(name string, tags ...Tag) *Timing {
-	n, tags := s.mergeDescriptors(name, tags)
-	k := newKey(n, tags)
+	k := s.key(name, tags)
 
 	t, ok := s.reg.timings.Load(k.String())
 	if !ok {
+		n, tags := s.mergeDescriptors(name, tags)
 		timing := newTiming(s.reg.tr.Load(), n, tags, s.reg.pool)
 		timing.key = k.SafeString()
 		timing.reg = s.reg
-		t, _ = s.reg.timings.LoadOrStore(k.String(), timing)
+		t, _ = s.reg.timings.LoadOrStore(k.SafeString(), timing)
 	}
 
-	putKey(k)
+	k.Release()
 
 	return t
 }
 
-func (s *Statter) mergeDescriptors(name string, tags []Tag) (string, []Tag) {
-	if s.prefix != "" {
+func (s *Statter) key(name string, tags []Tag) *key {
+	switch {
+	case s.prefix != "" && name != "":
 		name = s.prefix + s.reg.cfg.separator + name
+	case name == "":
+		name = s.prefix
 	}
 
-	// Fast path: no tags at all.
-	if len(s.tags) == 0 && len(tags) == 0 {
-		return name, nil
-	}
+	keyTags := make([]Tag, len(s.tags), len(s.tags)+len(tags))
+	copy(keyTags, s.tags)
+	keyTags = mergeTags(keyTags, tags)
 
-	// Fast path: no base tags, single call-site tag — no key duplication possible.
-	// The variadic is a fresh slice per call; safe to return directly.
-	if len(s.tags) == 0 && len(tags) == 1 {
-		return name, tags
-	}
-
-	// Fast path: no call-site tags — return base tags directly.
-	// Safe because s.tags is pre-sorted (invariant) and immutable after statter
-	// creation. newKey calls sortTags which is a no-op read for sorted input.
-	if len(tags) == 0 {
-		return name, s.tags
-	}
-
-	// General path: merge base tags and call-site tags with deduplication.
-	// Also handles multiple call-site tags that may share the same key.
-	newTags := make([]Tag, len(s.tags), len(s.tags)+len(tags))
-	copy(newTags, s.tags)
-	for _, tag := range tags {
-		if i := tagIndex(newTags, tag[0]); i >= 0 {
-			newTags[i][1] = tag[1]
-		} else {
-			newTags = append(newTags, tag)
-		}
-	}
-
-	return name, newTags
+	return newKey(name, keyTags)
 }
 
-func tagIndex[T ~[2]string](tags []T, key string) int {
-	for i, t := range tags {
-		if t[0] == key {
-			return i
-		}
-	}
-	return -1
+func (s *Statter) mergeDescriptors(name string, tags []Tag) (string, []Tag) {
+	return mergeDescriptors(s.prefix, s.reg.cfg.separator, name, s.tags, tags)
 }
 
 // Close stops the reporting loop, flushes any pending stats to the reporter,

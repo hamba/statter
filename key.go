@@ -61,7 +61,7 @@ func (k *key) SafeString() string {
 	return string(k.b)
 }
 
-func putKey(k *key) {
+func (k *key) Release() {
 	keyPool.Put(k)
 }
 
