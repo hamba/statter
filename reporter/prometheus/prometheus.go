@@ -2,7 +2,9 @@
 package prometheus
 
 import (
+	"fmt"
 	"net/http"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -23,6 +25,16 @@ func WithBuckets(buckets []float64) Option {
 	}
 }
 
+// WithErrorLog sets the error log function for logging errors when registering metrics.
+func WithErrorLog(fn func(string)) Option {
+	return func(p *Prometheus) {
+		if fn == nil {
+			return
+		}
+		p.errLog = fn
+	}
+}
+
 // Prometheus is a prometheus stats collector.
 type Prometheus struct {
 	namespace string
@@ -37,6 +49,8 @@ type Prometheus struct {
 	gauges     hashtriemap.HashTrieMap[string, *prometheus.GaugeVec]
 	histograms hashtriemap.HashTrieMap[string, *prometheus.HistogramVec]
 	timings    hashtriemap.HashTrieMap[string, *prometheus.HistogramVec]
+
+	errLog func(string)
 }
 
 // New returns a new prometheus reporter.
@@ -48,6 +62,7 @@ func New(namespace string, opts ...Option) *Prometheus {
 		fqn:        fqn,
 		defBuckets: prometheus.DefBuckets,
 		reg:        prometheus.NewRegistry(),
+		errLog:     func(msg string) { _, _ = fmt.Fprintln(os.Stderr, msg) },
 	}
 
 	for _, opt := range opts {
@@ -80,7 +95,9 @@ func (p *Prometheus) Counter(name string, v int64, tags [][2]string) {
 
 		m, ok = p.counters.LoadOrStore(key, counter)
 		if !ok {
-			_ = p.reg.Register(m)
+			if err := p.reg.Register(m); err != nil {
+				p.errLog(fmt.Sprintf("Could not to register Prometheus counter %q: %v\n", name, err))
+			}
 		}
 	}
 
@@ -117,7 +134,9 @@ func (p *Prometheus) Gauge(name string, v float64, tags [][2]string) {
 
 		m, ok = p.gauges.LoadOrStore(key, gauge)
 		if !ok {
-			_ = p.reg.Register(m)
+			if err := p.reg.Register(m); err != nil {
+				p.errLog(fmt.Sprintf("Could not to register Prometheus gauge %q: %v\n", name, err))
+			}
 		}
 	}
 
@@ -156,7 +175,9 @@ func (p *Prometheus) Histogram(name string, tags [][2]string) func(v float64) {
 
 		m, ok = p.histograms.LoadOrStore(key, histo)
 		if !ok {
-			_ = p.reg.Register(m)
+			if err := p.reg.Register(m); err != nil {
+				p.errLog(fmt.Sprintf("Could not to register Prometheus histogram %q: %v\n", name, err))
+			}
 		}
 	}
 
@@ -198,7 +219,9 @@ func (p *Prometheus) Timing(name string, tags [][2]string) func(v time.Duration)
 
 		m, ok = p.timings.LoadOrStore(key, timing)
 		if !ok {
-			_ = p.reg.Register(m)
+			if err := p.reg.Register(m); err != nil {
+				p.errLog(fmt.Sprintf("Could not to register Prometheus histogram %q: %v\n", name, err))
+			}
 		}
 	}
 
