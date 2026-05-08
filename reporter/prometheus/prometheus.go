@@ -256,21 +256,6 @@ func (p *Prometheus) Close() error {
 	return nil
 }
 
-// SetMetricBuckets sets the buckets for a metric by name.
-//
-// This must be called before the metric is used, otherwise will be
-// ignored or can have unexpected results.
-//
-// Deprecated: Use RegisterHistogram instead, this function will be removed in a future release.
-func SetMetricBuckets(stats *statter.Statter, name string, buckets []float64) {
-	prom, ok := stats.Reporter().(*Prometheus)
-	if !ok {
-		return
-	}
-
-	prom.buckets.Store(stats.FullName(name), buckets)
-}
-
 // RegisterCounter registers a counter with the given label names with the prometheus registrar,
 // returning false if it has already been registered.
 func RegisterCounter(stats *statter.Statter, name string, lblNames []string, help string) bool {
