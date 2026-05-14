@@ -1,0 +1,52 @@
+name: Govulnfix
+
+permissions:
+  contents: write
+  pull-requests: write
+
+on:
+  workflow_dispatch:
+  schedule: # Monday at 04:00 UTC
+    - cron: '0 4 * * Mon'
+
+jobs:
+  vulnfix:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Go
+        id: install-go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Download dependencies
+        run: go mod download
+        if: steps.install-go.outputs.cache-hit != 'true'
+
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Install vulnfix
+        run: go install github.com/hamba/vulnfix@latest
+
+      - name: Run govulncheck and update go.mod
+        # govulncheck exits 3 when vulnerabilities are found; pipeline should
+        # still reach vulnfix, so we use a subshell with pipefail disabled.
+        run: |
+          set +o pipefail
+          govulncheck -json ./... | tee /tmp/vuln.json | vulnfix -o /tmp/vuln.md
+
+      - name: Open Pull Request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: govulncheck/auto-fix
+          delete-branch: "true"
+          commit-message: "chore(deps): fix vulnerabilities reported by govulncheck"
+          title: "chore(deps): fix vulnerabilities reported by govulncheck"
+          body-path: /tmp/vuln.md
+          labels: security,dependencies
