@@ -1,14 +1,13 @@
-name: Govulnfix
-
-permissions:
-  contents: write
-  pull-requests: write
-
 on:
   workflow_dispatch:
   schedule: # Monday at 04:00 UTC
     - cron: '0 4 * * Mon'
 
+permissions:
+  contents: write
+  pull-requests: write
+
+name: govulnfix
 jobs:
   vulnfix:
     runs-on: ubuntu-latest
