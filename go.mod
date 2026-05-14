@@ -3,10 +3,10 @@ module github.com/hamba/statter/v2
 go 1.25.10
 
 require (
-	github.com/VictoriaMetrics/metrics v1.42.0
+	github.com/VictoriaMetrics/metrics v1.43.2
 	github.com/cactus/go-statsd-client/v5 v5.1.0
 	github.com/go4org/hashtriemap v0.0.0-20251130024219-545ba229f689
-	github.com/hamba/logger/v2 v2.9.1
+	github.com/hamba/logger/v2 v2.10.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/stretchr/testify v1.11.1
 )
