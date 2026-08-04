@@ -183,6 +183,43 @@ func TestStatter_CounterComplexDelete(t *testing.T) {
 	m.AssertExpectations(t)
 }
 
+func TestStatter_CounterDeleteUnregistersBeforeReporter(t *testing.T) {
+	m := &mockComplexReporter{}
+
+	stats := statter.New(m, time.Second)
+
+	var got bool
+	m.On("RemoveCounter", "test", [][2]string{{"tag", "test"}}).Run(func(_ mock.Arguments) {
+		got = stats.HasCounter("test", tags.Str("tag", "test"))
+	})
+
+	stats.Counter("test", tags.Str("tag", "test")).Delete()
+
+	err := stats.Close()
+	require.NoError(t, err)
+
+	assert.False(t, got, "counter should be unregistered before the reporter is called")
+	m.AssertExpectations(t)
+}
+
+func TestStatter_CounterDeleteMatchesReportedTags(t *testing.T) {
+	m := &mockComplexReporter{}
+	m.On("Counter", "test", int64(2), [][2]string{{"a", "1"}, {"b", "2"}, {"c", "3"}})
+	m.On("RemoveCounter", "test", [][2]string{{"a", "1"}, {"b", "2"}, {"c", "3"}})
+
+	stats := statter.New(m, time.Second)
+	sub := stats.With("", tags.Str("b", "2"))
+
+	sub.Counter("test", tags.Str("c", "3"), tags.Str("a", "1")).Inc(2)
+
+	err := stats.Close()
+	require.NoError(t, err)
+
+	sub.Counter("test", tags.Str("c", "3"), tags.Str("a", "1")).Delete()
+
+	m.AssertExpectations(t)
+}
+
 func TestStatter_Gauge(t *testing.T) {
 	m := &mockSimpleReporter{}
 	m.On("Gauge", "test", 1.23, [][2]string{{"tag", "test"}})
@@ -428,6 +465,20 @@ func TestStatter_HistogramAggregatedDelete(t *testing.T) {
 	m.AssertExpectations(t)
 }
 
+func TestStatter_HistogramAggregatedRemovableDelete(t *testing.T) {
+	m := &mockRemovableReporter{}
+	expectSampleRemoval(m, "")
+
+	stats := statter.New(m, time.Second)
+
+	stats.Histogram("test", tags.Str("tag", "test")).Delete()
+
+	err := stats.Close()
+	require.NoError(t, err)
+
+	m.AssertExpectations(t)
+}
+
 func TestStatter_Timing(t *testing.T) {
 	m := &mockComplexReporter{}
 	m.On("Timing", "test", [][2]string{{"tag", "test"}}).Return(func(v time.Duration) {
@@ -585,6 +636,79 @@ func TestStatter_TimingAggregatedDelete(t *testing.T) {
 	m.AssertExpectations(t)
 }
 
+func TestStatter_GaugeDeleteUnregistersBeforeReporter(t *testing.T) {
+	m := &mockComplexReporter{}
+
+	stats := statter.New(m, time.Second)
+
+	var got bool
+	m.On("RemoveGauge", "test", [][2]string{{"tag", "test"}}).Run(func(_ mock.Arguments) {
+		got = stats.HasGauge("test", tags.Str("tag", "test"))
+	})
+
+	stats.Gauge("test", tags.Str("tag", "test")).Delete()
+
+	err := stats.Close()
+	require.NoError(t, err)
+
+	assert.False(t, got, "gauge should be unregistered before the reporter is called")
+	m.AssertExpectations(t)
+}
+
+func TestStatter_HistogramDeleteUnregistersBeforeReporter(t *testing.T) {
+	m := &mockComplexReporter{}
+	m.On("Histogram", "test", [][2]string{{"tag", "test"}}).Return(func(_ float64) {})
+
+	stats := statter.New(m, time.Second)
+
+	var got bool
+	m.On("RemoveHistogram", "test", [][2]string{{"tag", "test"}}).Run(func(_ mock.Arguments) {
+		got = stats.HasHistogram("test", tags.Str("tag", "test"))
+	})
+
+	stats.Histogram("test", tags.Str("tag", "test")).Delete()
+
+	err := stats.Close()
+	require.NoError(t, err)
+
+	assert.False(t, got, "histogram should be unregistered before the reporter is called")
+	m.AssertExpectations(t)
+}
+
+func TestStatter_TimingDeleteUnregistersBeforeReporter(t *testing.T) {
+	m := &mockComplexReporter{}
+	m.On("Timing", "test", [][2]string{{"tag", "test"}}).Return(func(_ time.Duration) {})
+
+	stats := statter.New(m, time.Second)
+
+	var got bool
+	m.On("RemoveTiming", "test", [][2]string{{"tag", "test"}}).Run(func(_ mock.Arguments) {
+		got = stats.HasTiming("test", tags.Str("tag", "test"))
+	})
+
+	stats.Timing("test", tags.Str("tag", "test")).Delete()
+
+	err := stats.Close()
+	require.NoError(t, err)
+
+	assert.False(t, got, "timing should be unregistered before the reporter is called")
+	m.AssertExpectations(t)
+}
+
+func TestStatter_TimingAggregatedRemovableDelete(t *testing.T) {
+	m := &mockRemovableReporter{}
+	expectSampleRemoval(m, "_ms")
+
+	stats := statter.New(m, time.Second)
+
+	stats.Timing("test", tags.Str("tag", "test")).Delete()
+
+	err := stats.Close()
+	require.NoError(t, err)
+
+	m.AssertExpectations(t)
+}
+
 func TestStatter_CloseFromSubStatterFails(t *testing.T) {
 	stats := statter.New(statter.DiscardReporter, time.Second).With("prefix", tags.Str("base", "val"))
 
@@ -660,6 +784,36 @@ func (r *mockComplexReporter) Timing(name string, tags [][2]string) func(v time.
 }
 
 func (r *mockComplexReporter) RemoveTiming(name string, tags [][2]string) {
+	_ = r.Called(name, tags)
+}
+
+// expectSampleRemoval expects the removal of every metric an aggregated
+// sample is reported under, with the given gauge suffix.
+func expectSampleRemoval(m *mockRemovableReporter, suffix string) {
+	m.On("RemoveCounter", "test_count", [][2]string{{"tag", "test"}})
+
+	for _, name := range []string{"sum", "mean", "stddev", "min", "max", "10p", "90p"} {
+		m.On("RemoveGauge", "test_"+name+suffix, [][2]string{{"tag", "test"}})
+	}
+}
+
+type mockRemovableReporter struct {
+	mock.Mock
+}
+
+func (r *mockRemovableReporter) Counter(name string, v int64, tags [][2]string) {
+	_ = r.Called(name, v, tags)
+}
+
+func (r *mockRemovableReporter) RemoveCounter(name string, tags [][2]string) {
+	_ = r.Called(name, tags)
+}
+
+func (r *mockRemovableReporter) Gauge(name string, v float64, tags [][2]string) {
+	_ = r.Called(name, v, tags)
+}
+
+func (r *mockRemovableReporter) RemoveGauge(name string, tags [][2]string) {
 	_ = r.Called(name, tags)
 }
 

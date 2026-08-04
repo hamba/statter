@@ -2,12 +2,9 @@
 package victoriametrics
 
 import (
-	"math"
 	"net/http"
-	"sort"
+	"slices"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/VictoriaMetrics/metrics"
@@ -18,9 +15,6 @@ import (
 type VictoriaMetrics struct {
 	fqn *fqn
 
-	mu     sync.RWMutex
-	gauges map[string]*gauge
-
 	set *metrics.Set
 }
 
@@ -29,9 +23,8 @@ func New() *VictoriaMetrics {
 	fqn := newFQN()
 
 	return &VictoriaMetrics{
-		fqn:    fqn,
-		set:    metrics.NewSet(),
-		gauges: map[string]*gauge{},
+		fqn: fqn,
+		set: metrics.NewSet(),
 	}
 }
 
@@ -57,42 +50,12 @@ func (m *VictoriaMetrics) RemoveCounter(name string, tags [][2]string) {
 	m.removeMetric(name, tags)
 }
 
-type gauge struct {
-	val atomic.Uint64
-}
-
-func (g *gauge) Get() float64 {
-	v := g.val.Load()
-	return math.Float64frombits(v)
-}
-
-func (g *gauge) Set(v float64) {
-	g.val.Store(math.Float64bits(v))
-}
-
 // Gauge reports a gauge value.
 func (m *VictoriaMetrics) Gauge(name string, v float64, tags [][2]string) {
 	lbls := formatTags(tags, m.fqn)
 	key := createKey(name, lbls, m.fqn)
 
-	if m.setExistingGauge(key, v) {
-		return
-	}
-
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	// Double check that it was not added while we queued for the lock.
-	g, ok := m.gauges[key]
-	if ok {
-		g.Set(v)
-		return
-	}
-
-	g = &gauge{}
-	m.gauges[key] = g
-
-	m.set.NewGauge(key, g.Get)
+	g := m.set.GetOrCreateGauge(key, nil)
 
 	g.Set(v)
 }
@@ -100,18 +63,6 @@ func (m *VictoriaMetrics) Gauge(name string, v float64, tags [][2]string) {
 // RemoveGauge removes a gauge.
 func (m *VictoriaMetrics) RemoveGauge(name string, tags [][2]string) {
 	m.removeMetric(name, tags)
-}
-
-func (m *VictoriaMetrics) setExistingGauge(key string, v float64) bool {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	g, ok := m.gauges[key]
-	if ok {
-		g.Set(v)
-		return true
-	}
-	return false
 }
 
 // Histogram reports a histogram value.
@@ -176,9 +127,12 @@ func formatTags(tags [][2]string, fqn *fqn) string {
 		return ""
 	}
 
-	sort.Slice(tags, func(i, j int) bool {
-		return tags[i][0] < tags[j][0]
-	})
+	// The tags are owned by the caller and may be read concurrently, so they
+	// must never be sorted in place.
+	if !slices.IsSortedFunc(tags, compareTags) {
+		tags = slices.Clone(tags)
+		slices.SortFunc(tags, compareTags)
+	}
 
 	buf := pool.Get()
 	for i, tag := range tags {
@@ -195,6 +149,10 @@ func formatTags(tags [][2]string, fqn *fqn) string {
 	s := string(buf.Bytes())
 	pool.Put(buf)
 	return s
+}
+
+func compareTags(a, b [2]string) int {
+	return strings.Compare(a[0], b[0])
 }
 
 type fqn struct {
