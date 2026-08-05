@@ -84,6 +84,51 @@ func BenchmarkStatter_Timing(b *testing.B) {
 	_ = s.Close()
 }
 
+func BenchmarkScope_Resolve(b *testing.B) {
+	s := statter.New(discardReporter{}, time.Second)
+	s.Scope("scope", tags.Str("rev", "abc"))
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			s.Scope("scope", tags.Str("rev", "abc"))
+		}
+	})
+
+	b.StopTimer()
+	_ = s.Close()
+}
+
+func BenchmarkScope_Gauge(b *testing.B) {
+	s := statter.New(discardReporter{}, time.Second)
+	sc := s.Scope("scope", tags.Str("rev", "abc"))
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			sc.Gauge("test", tags.Str("test", "test")).Set(1)
+		}
+	})
+
+	b.StopTimer()
+	_ = s.Close()
+}
+
+func BenchmarkScope_Rotate(b *testing.B) {
+	s := statter.New(discardReporter{}, time.Second)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; b.Loop(); i++ {
+		s.Scope("scope", tags.Int("rev", i)).Gauge("test").Set(1)
+	}
+
+	b.StopTimer()
+	_ = s.Close()
+}
+
 func BenchmarkStatter_PrometheusHistogram(b *testing.B) {
 	s := statter.New(prometheus.New("test"), time.Second)
 
