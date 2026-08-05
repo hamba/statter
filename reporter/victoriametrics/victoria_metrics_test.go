@@ -88,6 +88,22 @@ func TestVictoriaMetrics_RemoveGauge(t *testing.T) {
 	assert.NotContains(t, rr.Body.String(), "test_test_test{foo=\"bar\"} 2.1")
 }
 
+func TestVictoriaMetrics_GaugeAfterRemoveGauge(t *testing.T) {
+	p := victoriametrics.New()
+	t.Cleanup(func() { _ = p.Close() })
+
+	p.Gauge("test.test.test", 2.1, [][2]string{{"foo", "bar"}})
+	p.RemoveGauge("test.test.test", [][2]string{{"foo", "bar"}})
+
+	p.Gauge("test.test.test", 3.2, [][2]string{{"foo", "bar"}})
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics", nil)
+	p.Handler().ServeHTTP(rr, req)
+
+	assert.Contains(t, rr.Body.String(), "test_test_test{foo=\"bar\"} 3.2")
+}
+
 func TestVictoriaMetrics_Histogram(t *testing.T) {
 	p := victoriametrics.New()
 	t.Cleanup(func() { _ = p.Close() })
@@ -176,6 +192,17 @@ func TestVictoriaMetrics_NoTags(t *testing.T) {
 	p.Handler().ServeHTTP(rr, req)
 
 	assert.Contains(t, rr.Body.String(), "test 2")
+}
+
+func TestVictoriaMetrics_DoesNotMutateTags(t *testing.T) {
+	p := victoriametrics.New()
+	t.Cleanup(func() { _ = p.Close() })
+
+	tgs := [][2]string{{"test", "test"}, {"foo", "bar"}}
+
+	p.Counter("test.test.test", 2, tgs)
+
+	assert.Equal(t, [][2]string{{"test", "test"}, {"foo", "bar"}}, tgs)
 }
 
 func TestVictoriaMetrics_Close(t *testing.T) {

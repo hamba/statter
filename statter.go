@@ -14,6 +14,8 @@ import (
 var DiscardReporter = discardReporter{}
 
 // Reporter represents a stats reporter.
+//
+// The statter passes tags sorted by key.
 type Reporter interface {
 	Counter(name string, v int64, tags [][2]string)
 	Gauge(name string, v float64, tags [][2]string)
@@ -121,8 +123,8 @@ func New(r Reporter, interval time.Duration, opts ...Option) *Statter {
 		opt(&cfg)
 	}
 
-	// Sort initial tags once to maintain the sorted-base-tags invariant,
-	// enabling zero-alloc fast paths in mergeDescriptors.
+	// Sort initial tags once so the root tags match the sorted tag order used
+	// for metric keys.
 	if len(cfg.tags) > 1 {
 		sortTags(cfg.tags)
 	}
@@ -360,10 +362,11 @@ func (c *Counter) Inc(v int64) {
 
 // Delete removes the counter.
 func (c *Counter) Delete() {
+	_, _ = c.reg.counters.LoadAndDelete(c.key)
+
 	if rr, ok := c.reg.r.(RemovableReporter); ok {
 		rr.RemoveCounter(c.name, c.tags)
 	}
-	_, _ = c.reg.counters.LoadAndDelete(c.key)
 }
 
 func (c *Counter) value() int64 {
@@ -414,10 +417,11 @@ func (g *Gauge) Sub(v float64) {
 
 // Delete removes the gauge.
 func (g *Gauge) Delete() {
+	_, _ = g.reg.gauges.LoadAndDelete(g.key)
+
 	if rr, ok := g.reg.r.(RemovableReporter); ok {
 		rr.RemoveGauge(g.name, g.tags)
 	}
-	_, _ = g.reg.gauges.LoadAndDelete(g.key)
 }
 
 func (g *Gauge) value() float64 {
@@ -477,14 +481,16 @@ func (h *Histogram) Observe(v float64) {
 
 // Delete removes the histogram.
 func (h *Histogram) Delete() {
+	_, _ = h.reg.histograms.LoadAndDelete(h.key)
+
 	if rtr, ok := h.reg.r.(RemovableHistogramReporter); ok {
 		rtr.RemoveHistogram(h.name, h.tags)
 	} else if rr, ok := h.reg.r.(RemovableReporter); ok {
-		for _, k := range h.reg.sampleKeys(h.name, "") {
+		rr.RemoveCounter(countKey(h.name), h.tags)
+		for _, k := range h.reg.sampleGaugeKeys(h.name, "") {
 			rr.RemoveGauge(k, h.tags)
 		}
 	}
-	_, _ = h.reg.histograms.LoadAndDelete(h.key)
 }
 
 func (h *Histogram) value() *stats.Sample {
@@ -552,14 +558,16 @@ func (t *Timing) Observe(d time.Duration) {
 
 // Delete removes the timing.
 func (t *Timing) Delete() {
+	_, _ = t.reg.timings.LoadAndDelete(t.key)
+
 	if rtr, ok := t.reg.r.(RemovableTimingReporter); ok {
 		rtr.RemoveTiming(t.name, t.tags)
 	} else if rr, ok := t.reg.r.(RemovableReporter); ok {
-		for _, k := range t.reg.sampleKeys(t.name, "_ms") {
+		rr.RemoveCounter(countKey(t.name), t.tags)
+		for _, k := range t.reg.sampleGaugeKeys(t.name, "_ms") {
 			rr.RemoveGauge(k, t.tags)
 		}
 	}
-	_, _ = t.reg.timings.LoadAndDelete(t.key)
 }
 
 func (t *Timing) value() *stats.Sample {

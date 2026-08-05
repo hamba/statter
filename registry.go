@@ -115,7 +115,7 @@ func (r *registry) reportSample(name, suffix string, tags [][2]string, sample *s
 	}
 
 	prefix := name + "_"
-	r.r.Counter(prefix+"count", sample.Count(), tags)
+	r.r.Counter(countKey(name), sample.Count(), tags)
 	r.r.Gauge(prefix+"sum"+suffix, sample.Sum(), tags)
 	r.r.Gauge(prefix+"mean"+suffix, sample.Mean(), tags)
 	r.r.Gauge(prefix+"stddev"+suffix, sample.StdDev(), tags)
@@ -129,10 +129,13 @@ func (r *registry) reportSample(name, suffix string, tags [][2]string, sample *s
 	}
 }
 
-func (r *registry) sampleKeys(name, suffix string) []string {
+func countKey(name string) string {
+	return name + "_count"
+}
+
+func (r *registry) sampleGaugeKeys(name, suffix string) []string {
 	prefix := name + "_"
-	keys := make([]string, 0, 6+len(r.cfg.percentiles))
-	keys = append(keys, prefix+"count")
+	keys := make([]string, 0, 5+len(r.cfg.percentiles))
 	keys = append(keys, prefix+"sum"+suffix)
 	keys = append(keys, prefix+"mean"+suffix)
 	keys = append(keys, prefix+"stddev"+suffix)
@@ -149,12 +152,6 @@ func (r *registry) sampleKeys(name, suffix string) []string {
 // SubStatter returns a unique sub statter.
 func (r *registry) SubStatter(parent *Statter, prefix string, tags []Tag) *Statter {
 	name, newTags := mergeDescriptors(parent.prefix, r.cfg.separator, prefix, parent.tags, tags)
-
-	// Sort merged tags to maintain the sorted-base-tags invariant so that
-	// the mergeDescriptors fast paths in metric accessors are safe.
-	if len(newTags) > 1 {
-		sortTags(newTags)
-	}
 
 	k := newKey(name, newTags)
 	defer k.Release()
@@ -210,6 +207,13 @@ func mergeDescriptors(prefix, sep, name string, baseTags, tags []Tag) (string, [
 	newTags := make([]Tag, len(baseTags), len(baseTags)+len(tags))
 	copy(newTags, baseTags)
 	newTags = mergeTags(newTags, tags)
+
+	// The tags must be sorted to match the metric key, which is also sorted.
+	// Without this the tag order reaching the reporter would depend on which
+	// call site created the metric first.
+	if len(newTags) > 1 {
+		sortTags(newTags)
+	}
 
 	return name, newTags
 }

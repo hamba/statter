@@ -88,6 +88,53 @@ func TestPrometheus_RemoveGauge(t *testing.T) {
 	assert.NotContains(t, rr.Body.String(), "test_test_test{foo=\"bar\"} 2.1")
 }
 
+func TestPrometheus_GaugeDistinctNamesDoNotCollide(t *testing.T) {
+	p := prometheus.New("test")
+	t.Cleanup(func() { _ = p.Close() })
+
+	p.Gauge("foo", 1.23, [][2]string{{"bar", "baz"}})
+	p.Gauge("foobar", 3.21, nil)
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics", nil)
+	p.Handler().ServeHTTP(rr, req)
+
+	assert.Contains(t, rr.Body.String(), "test_foo{bar=\"baz\"} 1.23")
+	assert.Contains(t, rr.Body.String(), "test_foobar 3.21")
+}
+
+func TestPrometheus_GaugeSameFullNameDifferentKeys(t *testing.T) {
+	p := prometheus.New("test")
+	t.Cleanup(func() { _ = p.Close() })
+
+	// Both names format to the same fully qualified name, so the second gauge
+	// is already registered under a different key.
+	p.Gauge("foo.bar", 1.23, [][2]string{{"baz", "bat"}})
+	p.Gauge("foo-bar", 3.21, [][2]string{{"baz", "bat2"}})
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics", nil)
+	p.Handler().ServeHTTP(rr, req)
+
+	assert.Contains(t, rr.Body.String(), "test_foo_bar{baz=\"bat\"} 1.23")
+	assert.Contains(t, rr.Body.String(), "test_foo_bar{baz=\"bat2\"} 3.21")
+}
+
+func TestPrometheus_GaugeUnorderedTags(t *testing.T) {
+	p := prometheus.New("test")
+	t.Cleanup(func() { _ = p.Close() })
+
+	p.Gauge("foo", 1.23, [][2]string{{"a", "1"}, {"b", "2"}})
+	p.Gauge("foo", 3.21, [][2]string{{"b", "2"}, {"a", "3"}})
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics", nil)
+	p.Handler().ServeHTTP(rr, req)
+
+	assert.Contains(t, rr.Body.String(), "test_foo{a=\"1\",b=\"2\"} 1.23")
+	assert.Contains(t, rr.Body.String(), "test_foo{a=\"3\",b=\"2\"} 3.21")
+}
+
 func TestPrometheus_Histogram(t *testing.T) {
 	p := prometheus.New("test.test", prometheus.WithBuckets([]float64{0.1, 1.0}))
 	t.Cleanup(func() { _ = p.Close() })
@@ -240,6 +287,55 @@ func TestRegisterHistogram(t *testing.T) {
 	assert.Contains(t, rec.Body.String(), "foo_bar_baz_bat_bucket{label1=\"value1\",le=\"1\"} 1")
 	assert.Contains(t, rec.Body.String(), "foo_bar_baz_bat_sum{label1=\"value1\"} 0.0123")
 	assert.Contains(t, rec.Body.String(), "foo_bar_baz_bat_count{label1=\"value1\"} 1")
+}
+
+func TestRegisterCounter_FormatsLabelNames(t *testing.T) {
+	p := prometheus.New("foo.bar")
+	stats := statter.New(p, time.Second).With("baz")
+
+	prometheus.RegisterCounter(stats, "bat", []string{"label-1"}, "my awesome counter")
+
+	p.Counter("baz.bat", 1, [][2]string{{"label-1", "value1"}})
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics", nil)
+	p.Handler().ServeHTTP(rec, req)
+
+	assert.Contains(t, rec.Body.String(), `HELP foo_bar_baz_bat my awesome counter`)
+	assert.Contains(t, rec.Body.String(), `foo_bar_baz_bat{label_1="value1"} 1`)
+}
+
+func TestRegisterCounter_DoesNotMutateLabelNames(t *testing.T) {
+	p := prometheus.New("foo.bar")
+	stats := statter.New(p, time.Second).With("baz")
+
+	lblNames := []string{"label2", "label1"}
+
+	prometheus.RegisterCounter(stats, "bat", lblNames, "my awesome counter")
+
+	assert.Equal(t, []string{"label2", "label1"}, lblNames)
+}
+
+func TestRegisterGauge_DoesNotMutateLabelNames(t *testing.T) {
+	p := prometheus.New("foo.bar")
+	stats := statter.New(p, time.Second).With("baz")
+
+	lblNames := []string{"label2", "label1"}
+
+	prometheus.RegisterGauge(stats, "bat", lblNames, "my awesome gauge")
+
+	assert.Equal(t, []string{"label2", "label1"}, lblNames)
+}
+
+func TestRegisterHistogram_DoesNotMutateLabelNames(t *testing.T) {
+	p := prometheus.New("foo.bar")
+	stats := statter.New(p, time.Second).With("baz")
+
+	lblNames := []string{"label2", "label1"}
+
+	prometheus.RegisterHistogram(stats, "bat", lblNames, nil, "my awesome histogram")
+
+	assert.Equal(t, []string{"label2", "label1"}, lblNames)
 }
 
 func TestRegisterHistogram_HandlesNoBuckets(t *testing.T) {

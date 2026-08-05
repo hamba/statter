@@ -80,7 +80,7 @@ func (p *Prometheus) Handler() http.Handler {
 // Counter reports a counter value.
 func (p *Prometheus) Counter(name string, v int64, tags [][2]string) {
 	lblNames, lbls := formatTags(tags, p.fqn)
-	key := createKey(name, lblNames)
+	key := createKey(name, lblNames, p.fqn)
 
 	m, ok := p.counters.Load(key)
 	if !ok {
@@ -107,7 +107,7 @@ func (p *Prometheus) Counter(name string, v int64, tags [][2]string) {
 // RemoveCounter removes the counter.
 func (p *Prometheus) RemoveCounter(name string, tags [][2]string) {
 	lblNames, lbls := formatTags(tags, p.fqn)
-	key := createKey(name, lblNames)
+	key := createKey(name, lblNames, p.fqn)
 
 	m, ok := p.counters.Load(key)
 	if !ok {
@@ -119,7 +119,7 @@ func (p *Prometheus) RemoveCounter(name string, tags [][2]string) {
 // Gauge reports a gauge value.
 func (p *Prometheus) Gauge(name string, v float64, tags [][2]string) {
 	lblNames, lbls := formatTags(tags, p.fqn)
-	key := createKey(name, lblNames)
+	key := createKey(name, lblNames, p.fqn)
 
 	m, ok := p.gauges.Load(key)
 	if !ok {
@@ -146,7 +146,7 @@ func (p *Prometheus) Gauge(name string, v float64, tags [][2]string) {
 // RemoveGauge removes the gauge.
 func (p *Prometheus) RemoveGauge(name string, tags [][2]string) {
 	lblNames, lbls := formatTags(tags, p.fqn)
-	key := createKey(name, lblNames)
+	key := createKey(name, lblNames, p.fqn)
 
 	m, ok := p.gauges.Load(key)
 	if !ok {
@@ -158,7 +158,7 @@ func (p *Prometheus) RemoveGauge(name string, tags [][2]string) {
 // Histogram reports a histogram value.
 func (p *Prometheus) Histogram(name string, tags [][2]string) func(v float64) {
 	lblNames, lbls := formatTags(tags, p.fqn)
-	key := createKey(name, lblNames)
+	key := createKey(name, lblNames, p.fqn)
 
 	m, ok := p.histograms.Load(key)
 	if !ok {
@@ -190,7 +190,7 @@ func (p *Prometheus) Histogram(name string, tags [][2]string) func(v float64) {
 // RemoveHistogram removes the histogram.
 func (p *Prometheus) RemoveHistogram(name string, tags [][2]string) {
 	lblNames, lbls := formatTags(tags, p.fqn)
-	key := createKey(name, lblNames)
+	key := createKey(name, lblNames, p.fqn)
 
 	m, ok := p.histograms.Load(key)
 	if !ok {
@@ -202,7 +202,7 @@ func (p *Prometheus) RemoveHistogram(name string, tags [][2]string) {
 // Timing reports a timing value as a histogram in seconds.
 func (p *Prometheus) Timing(name string, tags [][2]string) func(v time.Duration) {
 	lblNames, lbls := formatTags(tags, p.fqn)
-	key := createKey(name, lblNames)
+	key := createKey(name, lblNames, p.fqn)
 
 	m, ok := p.timings.Load(key)
 	if !ok {
@@ -234,7 +234,7 @@ func (p *Prometheus) Timing(name string, tags [][2]string) func(v time.Duration)
 // RemoveTiming removes the timing.
 func (p *Prometheus) RemoveTiming(name string, tags [][2]string) {
 	lblNames, lbls := formatTags(tags, p.fqn)
-	key := createKey(name, lblNames)
+	key := createKey(name, lblNames, p.fqn)
 
 	m, ok := p.timings.Load(key)
 	if !ok {
@@ -265,7 +265,8 @@ func RegisterCounter(stats *statter.Statter, name string, lblNames []string, hel
 	}
 
 	name = stats.FullName(name)
-	sort.Strings(lblNames)
+
+	lblNames = formatLabelNames(lblNames, prom.fqn)
 
 	counter := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
@@ -276,7 +277,7 @@ func RegisterCounter(stats *statter.Statter, name string, lblNames []string, hel
 		lblNames,
 	)
 
-	key := createKey(name, lblNames)
+	key := createKey(name, lblNames, prom.fqn)
 	if vec, ok := prom.counters.LoadOrStore(key, counter); !ok {
 		_ = prom.reg.Register(vec)
 		return true
@@ -293,7 +294,8 @@ func RegisterGauge(stats *statter.Statter, name string, lblNames []string, help 
 	}
 
 	name = stats.FullName(name)
-	sort.Strings(lblNames)
+
+	lblNames = formatLabelNames(lblNames, prom.fqn)
 
 	gauge := prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
@@ -304,7 +306,7 @@ func RegisterGauge(stats *statter.Statter, name string, lblNames []string, help 
 		lblNames,
 	)
 
-	key := createKey(name, lblNames)
+	key := createKey(name, lblNames, prom.fqn)
 	if vec, ok := prom.gauges.LoadOrStore(key, gauge); !ok {
 		_ = prom.reg.Register(vec)
 		return true
@@ -321,7 +323,8 @@ func RegisterHistogram(stats *statter.Statter, name string, lblNames []string, b
 	}
 
 	name = stats.FullName(name)
-	sort.Strings(lblNames)
+
+	lblNames = formatLabelNames(lblNames, prom.fqn)
 	if len(buckets) == 0 {
 		buckets = prom.defBuckets
 	}
@@ -336,7 +339,7 @@ func RegisterHistogram(stats *statter.Statter, name string, lblNames []string, b
 		lblNames,
 	)
 
-	key := createKey(name, lblNames)
+	key := createKey(name, lblNames, prom.fqn)
 	if vec, ok := prom.histograms.LoadOrStore(key, histogram); !ok {
 		_ = prom.reg.Register(vec)
 		return true
@@ -344,9 +347,14 @@ func RegisterHistogram(stats *statter.Statter, name string, lblNames []string, b
 	return false
 }
 
+// keySep separates the name and label names in a metric key. It is not a
+// valid character in a Prometheus metric or label name, ensuring distinct
+// metrics can never share a key.
+const keySep = "\xff"
+
 // createKey creates a unique metric key.
-func createKey(name string, lblNames []string) string {
-	return name + strings.Join(lblNames, ":")
+func createKey(name string, lblNames []string, fqn *fqn) string {
+	return fqn.Format(name) + keySep + strings.Join(lblNames, keySep)
 }
 
 // formatTags creates a prometheus Label map from tags.
@@ -362,6 +370,19 @@ func formatTags(tags [][2]string, fqn *fqn) ([]string, prometheus.Labels) {
 	sort.Strings(names)
 
 	return names, lbls
+}
+
+// formatLabelNames returns the formatted, sorted label names. The given names
+// are owned by the caller and are left untouched.
+func formatLabelNames(lblNames []string, fqn *fqn) []string {
+	names := make([]string, 0, len(lblNames))
+	for _, name := range lblNames {
+		names = append(names, fqn.Format(name))
+	}
+
+	sort.Strings(names)
+
+	return names
 }
 
 type fqn struct {
