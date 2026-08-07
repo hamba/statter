@@ -12,7 +12,16 @@
 // with identical resolved prefix and tags are deduplicated and share the same
 // instance.
 //
+// The [Statter.Scope] method returns a [Scope], a sub-statter identified by a
+// caller supplied id. A Scope tracks the metrics created through it, so they
+// can be removed together with [Scope.Delete]. Requesting a Scope with an
+// existing id but different tags deletes the previous Scope and its metrics,
+// which keeps metrics unique for a set of tags, such as a gauge carrying a
+// revision that changes over time.
+//
 // The [Reporter] interface is the only contract that backend adapters must
 // satisfy. Richer adapters may additionally implement [HistogramReporter],
-// [TimingReporter], and the corresponding Removable* interfaces.
+// [TimingReporter], and the corresponding Removable* interfaces. Metrics are
+// only removed from the backend if the reporter implements the relevant
+// Removable* interface, otherwise deletion only stops local aggregation.
 package statter

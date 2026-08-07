@@ -21,6 +21,9 @@ type registry struct {
 	gauges     hashtriemap.HashTrieMap[string, *Gauge]
 	histograms hashtriemap.HashTrieMap[string, *Histogram]
 	timings    hashtriemap.HashTrieMap[string, *Timing]
+	scopes     hashtriemap.HashTrieMap[string, *Scope]
+
+	reportMu sync.RWMutex
 
 	mu       sync.RWMutex
 	root     *Statter
@@ -76,6 +79,9 @@ func (r *registry) runReportLoop(d time.Duration) {
 }
 
 func (r *registry) report() {
+	r.reportMu.Lock()
+	defer r.reportMu.Unlock()
+
 	r.counters.Range(func(_ string, c *Counter) bool {
 		val := c.value()
 		if val == 0 {
@@ -179,6 +185,38 @@ func (r *registry) SubStatter(parent *Statter, prefix string, tags []Tag) *Statt
 	r.mu.Unlock()
 
 	return s
+}
+
+// Scope returns the scope with the given id, creating it if needed. If a scope
+// with the id already exists under a different parent or with different tags,
+// it and all metrics created through it are deleted and replaced.
+func (r *registry) Scope(parent *Statter, id string, tags []Tag) *Scope {
+	for {
+		cur, ok := r.scopes.Load(id)
+		if ok && cur.matches(parent, tags) {
+			return cur
+		}
+
+		next := newScope(r, parent, id, tags)
+
+		if !ok {
+			if _, loaded := r.scopes.LoadOrStore(id, next); !loaded {
+				return next
+			}
+			continue
+		}
+
+		if r.scopes.CompareAndSwap(id, cur, next) {
+			cur.delete(false)
+			return next
+		}
+	}
+}
+
+// HasScope determines if a scope with the given id exists.
+func (r *registry) HasScope(id string) bool {
+	_, ok := r.scopes.Load(id)
+	return ok
 }
 
 // Close closes the registry if the caller is the root statter,

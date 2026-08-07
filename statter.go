@@ -149,6 +149,31 @@ func (s *Statter) With(prefix string, tags ...Tag) *Statter {
 	return s.reg.SubStatter(s, prefix, tags)
 }
 
+// Scope returns a Scope with the given id and tags, derived from s. Metrics
+// created through the Scope are tracked by it, and can be removed as a batch
+// with [Scope.Delete].
+//
+// If a Scope with the same id already exists, derived from the same statter and
+// with identical tags, it is returned. If it exists with different tags, or was
+// derived from a different statter, the existing Scope and every metric created
+// through it are deleted and a new Scope is returned. This makes a Scope useful
+// for metrics that must be unique for a set of tags, such as a gauge carrying a
+// revision that changes over time.
+//
+// Scope ids are global to the statter tree and are not namespaced by prefix.
+//
+// A metric created through a Scope shares its registration with an identical
+// metric created directly on a statter. Deleting the Scope therefore also
+// removes the metric from the direct caller.
+func (s *Statter) Scope(id string, tags ...Tag) *Scope {
+	return s.reg.Scope(s, id, tags)
+}
+
+// HasScope determines if a scope with the given id exists.
+func (s *Statter) HasScope(id string) bool {
+	return s.reg.HasScope(id)
+}
+
 // Reporter returns the underlying stats reporter.
 //
 // The reporter is exposed for advanced use cases such as pre-registering
@@ -182,8 +207,16 @@ func (s *Statter) HasCounter(name string, tags ...Tag) bool {
 // created on the first call and the same instance is returned for subsequent
 // calls with identical name and tags.
 func (s *Statter) Counter(name string, tags ...Tag) *Counter {
+	c, _ := s.counter(name, tags)
+	return c
+}
+
+// counter returns the counter for the given name and tags, reporting whether
+// this call created it.
+func (s *Statter) counter(name string, tags []Tag) (*Counter, bool) {
 	k := s.key(name, tags)
 
+	var created bool
 	c, ok := s.reg.counters.Load(k.String())
 	if !ok {
 		n, t := s.mergeDescriptors(name, tags)
@@ -193,12 +226,15 @@ func (s *Statter) Counter(name string, tags ...Tag) *Counter {
 			key:  k.SafeString(),
 			reg:  s.reg,
 		}
-		c, _ = s.reg.counters.LoadOrStore(k.SafeString(), counter)
+
+		var loaded bool
+		c, loaded = s.reg.counters.LoadOrStore(k.SafeString(), counter)
+		created = !loaded
 	}
 
 	k.Release()
 
-	return c
+	return c, created
 }
 
 // HasGauge determines if the gauge exists.
@@ -216,8 +252,16 @@ func (s *Statter) HasGauge(name string, tags ...Tag) bool {
 // the first call and the same instance is returned for subsequent calls with
 // identical name and tags.
 func (s *Statter) Gauge(name string, tags ...Tag) *Gauge {
+	g, _ := s.gauge(name, tags)
+	return g
+}
+
+// gauge returns the gauge for the given name and tags, reporting whether this
+// call created it.
+func (s *Statter) gauge(name string, tags []Tag) (*Gauge, bool) {
 	k := s.key(name, tags)
 
+	var created bool
 	g, ok := s.reg.gauges.Load(k.String())
 	if !ok {
 		n, t := s.mergeDescriptors(name, tags)
@@ -227,12 +271,15 @@ func (s *Statter) Gauge(name string, tags ...Tag) *Gauge {
 			key:  k.SafeString(),
 			reg:  s.reg,
 		}
-		g, _ = s.reg.gauges.LoadOrStore(k.SafeString(), gauge)
+
+		var loaded bool
+		g, loaded = s.reg.gauges.LoadOrStore(k.SafeString(), gauge)
+		created = !loaded
 	}
 
 	k.Release()
 
-	return g
+	return g, created
 }
 
 // HasHistogram determines if the histogram exists.
@@ -255,20 +302,31 @@ func (s *Statter) HasHistogram(name string, tags ...Tag) bool {
 // each interval as a set of gauges (_sum, _mean, _stddev, _min, _max, and
 // each configured percentile) plus a _count counter.
 func (s *Statter) Histogram(name string, tags ...Tag) *Histogram {
+	h, _ := s.histogram(name, tags)
+	return h
+}
+
+// histogram returns the histogram for the given name and tags, reporting
+// whether this call created it.
+func (s *Statter) histogram(name string, tags []Tag) (*Histogram, bool) {
 	k := s.key(name, tags)
 
+	var created bool
 	h, ok := s.reg.histograms.Load(k.String())
 	if !ok {
 		n, t := s.mergeDescriptors(name, tags)
 		histogram := newHistogram(s.reg.hr, n, t, s.reg.pool)
 		histogram.key = k.SafeString()
 		histogram.reg = s.reg
-		h, _ = s.reg.histograms.LoadOrStore(k.SafeString(), histogram)
+
+		var loaded bool
+		h, loaded = s.reg.histograms.LoadOrStore(k.SafeString(), histogram)
+		created = !loaded
 	}
 
 	k.Release()
 
-	return h
+	return h, created
 }
 
 // HasTiming determines if the timing exists.
@@ -292,20 +350,31 @@ func (s *Statter) HasTiming(name string, tags ...Tag) bool {
 // (_sum_ms, _mean_ms, _stddev_ms, _min_ms, _max_ms, and each configured
 // percentile) plus a _count counter.
 func (s *Statter) Timing(name string, tags ...Tag) *Timing {
+	t, _ := s.timing(name, tags)
+	return t
+}
+
+// timing returns the timing for the given name and tags, reporting whether
+// this call created it.
+func (s *Statter) timing(name string, tags []Tag) (*Timing, bool) {
 	k := s.key(name, tags)
 
+	var created bool
 	t, ok := s.reg.timings.Load(k.String())
 	if !ok {
 		n, tags := s.mergeDescriptors(name, tags)
 		timing := newTiming(s.reg.tr, n, tags, s.reg.pool)
 		timing.key = k.SafeString()
 		timing.reg = s.reg
-		t, _ = s.reg.timings.LoadOrStore(k.SafeString(), timing)
+
+		var loaded bool
+		t, loaded = s.reg.timings.LoadOrStore(k.SafeString(), timing)
+		created = !loaded
 	}
 
 	k.Release()
 
-	return t
+	return t, created
 }
 
 func (s *Statter) key(name string, tags []Tag) *key {
@@ -362,7 +431,12 @@ func (c *Counter) Inc(v int64) {
 
 // Delete removes the counter.
 func (c *Counter) Delete() {
-	_, _ = c.reg.counters.LoadAndDelete(c.key)
+	c.reg.reportMu.RLock()
+	defer c.reg.reportMu.RUnlock()
+
+	if !c.reg.counters.CompareAndDelete(c.key, c) {
+		return
+	}
 
 	if rr, ok := c.reg.r.(RemovableReporter); ok {
 		rr.RemoveCounter(c.name, c.tags)
@@ -417,7 +491,12 @@ func (g *Gauge) Sub(v float64) {
 
 // Delete removes the gauge.
 func (g *Gauge) Delete() {
-	_, _ = g.reg.gauges.LoadAndDelete(g.key)
+	g.reg.reportMu.RLock()
+	defer g.reg.reportMu.RUnlock()
+
+	if !g.reg.gauges.CompareAndDelete(g.key, g) {
+		return
+	}
 
 	if rr, ok := g.reg.r.(RemovableReporter); ok {
 		rr.RemoveGauge(g.name, g.tags)
@@ -481,7 +560,12 @@ func (h *Histogram) Observe(v float64) {
 
 // Delete removes the histogram.
 func (h *Histogram) Delete() {
-	_, _ = h.reg.histograms.LoadAndDelete(h.key)
+	h.reg.reportMu.RLock()
+	defer h.reg.reportMu.RUnlock()
+
+	if !h.reg.histograms.CompareAndDelete(h.key, h) {
+		return
+	}
 
 	if rtr, ok := h.reg.r.(RemovableHistogramReporter); ok {
 		rtr.RemoveHistogram(h.name, h.tags)
@@ -558,7 +642,12 @@ func (t *Timing) Observe(d time.Duration) {
 
 // Delete removes the timing.
 func (t *Timing) Delete() {
-	_, _ = t.reg.timings.LoadAndDelete(t.key)
+	t.reg.reportMu.RLock()
+	defer t.reg.reportMu.RUnlock()
+
+	if !t.reg.timings.CompareAndDelete(t.key, t) {
+		return
+	}
 
 	if rtr, ok := t.reg.r.(RemovableTimingReporter); ok {
 		rtr.RemoveTiming(t.name, t.tags)

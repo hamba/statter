@@ -1,7 +1,9 @@
 package statter
 
 import (
+	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -44,4 +46,23 @@ func TestWithPercentiles(t *testing.T) {
 	WithPercentiles([]float64{1, 2, 3})(&cfg)
 
 	assert.Equal(t, []float64{1, 2, 3}, cfg.percentiles)
+}
+
+func TestStatter_ScopeDoesNotPolluteStatters(t *testing.T) {
+	stats := New(DiscardReporter, time.Second)
+	t.Cleanup(func() { _ = stats.Close() })
+
+	stats.reg.mu.RLock()
+	want := len(stats.reg.statters)
+	stats.reg.mu.RUnlock()
+
+	for i := range 100 {
+		stats.Scope("scope", [2]string{"rev", strconv.Itoa(i)}).Gauge("test").Set(1)
+	}
+
+	stats.reg.mu.RLock()
+	got := len(stats.reg.statters)
+	stats.reg.mu.RUnlock()
+
+	assert.Equal(t, want, got, "scopes must not be added to the statter cache")
 }

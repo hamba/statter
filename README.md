@@ -33,3 +33,32 @@ stats := statter.New(reporter, 10*time.Second).With("my-prefix")
 
 stats.Counter("my-counter", tags.Str("tag", "value")).Inc(1)
 ```
+
+### Scopes
+
+A `Scope` is a sub-statter identified by an id, which tracks the metrics created
+through it.
+
+Requesting a scope with an existing id but different tags removes the previous
+scope and every metric created through it. This keeps a metric unique for a set
+of tags, such as a gauge carrying a revision that changes over time:
+
+```go
+stats.Scope("build-info", tags.Str("revision", rev)).Gauge("info").Set(1)
+```
+
+The tracked metrics can also be removed together as a batch:
+
+```go
+scope := stats.Scope("tenant:"+id, tags.Str("tenant", id))
+scope.Counter("requests").Inc(1)
+scope.Timing("latency").Observe(d)
+
+scope.Delete() // Both metrics are removed.
+```
+
+Use `HasScope` to determine if a scope currently exists.
+
+**Note:** Metrics are only removed from the backend if the reporter supports
+removal, which the Prometheus and VictoriaMetrics reporters do. Otherwise
+deletion only stops local aggregation.
