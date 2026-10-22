@@ -1,4 +1,4 @@
-// Package statsd implements a statsd client.
+// Package statsd reports metrics to a StatsD server over UDP.
 package statsd
 
 import (
@@ -21,19 +21,19 @@ func defaultConfig() config {
 	}
 }
 
-// Option represents a statsd option function.
+// Option configures a Statsd reporter created by New.
 type Option func(*config)
 
-// WithFlushInterval sets the maximum flushInterval for packet sending.
-// Defaults to 300ms.
+// WithFlushInterval sets the maximum interval between UDP flushes. The
+// default is 300 milliseconds.
 func WithFlushInterval(interval time.Duration) Option {
 	return func(c *config) {
 		c.flushInterval = interval
 	}
 }
 
-// WithFlushBytes sets the maximum UDP packet size in bytes that will be sent.
-// Defaults to 1432 bytes.
+// WithFlushBytes sets the maximum UDP packet size in bytes. The default is
+// 1432 bytes.
 func WithFlushBytes(bytes int) Option {
 	return func(c *config) {
 		c.flushBytes = bytes
@@ -47,7 +47,9 @@ type Statsd struct {
 	es     statsd.ExtendedStatSender
 }
 
-// New returns a statsd reporter.
+// New returns a StatsD reporter configured with the server address, metric
+// prefix, and options. It returns an error if the underlying client cannot be
+// created.
 func New(addr, prefix string, opts ...Option) (*Statsd, error) {
 	cfg := defaultConfig()
 	for _, o := range opts {

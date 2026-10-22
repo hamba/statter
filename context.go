@@ -8,9 +8,10 @@ type ctxTags struct {
 	tags []Tag
 }
 
-// WithContext returns a new context with the given tags attached. If tags are
-// already present in ctx, the new tags are merged with them; a new tag whose
-// key already exists overrides the stored value.
+// WithContext returns a context derived from ctx with tags attached. If ctx
+// already carries tags added by WithContext, the new tags are merged and a
+// value with the same key replaces the existing value. With no tags, it
+// returns ctx unchanged.
 func WithContext(ctx context.Context, tags ...Tag) context.Context {
 	if len(tags) == 0 {
 		return ctx
@@ -31,8 +32,8 @@ func WithContext(ctx context.Context, tags ...Tag) context.Context {
 	return context.WithValue(ctx, contextKey{}, &ctxTags{tags: merged})
 }
 
-// FromContext returns a sub-statter whose tags include those stored in ctx by
-// WithContext. If no tags are found in ctx, s is returned unchanged.
+// FromContext returns a sub-statter with the tags stored in ctx by
+// WithContext. If ctx has no such tags, it returns s unchanged.
 func (s *Statter) FromContext(ctx context.Context) *Statter {
 	ct, _ := ctx.Value(contextKey{}).(*ctxTags)
 	if ct == nil || len(ct.tags) == 0 {
