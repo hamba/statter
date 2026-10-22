@@ -11,10 +11,14 @@ type deletable interface {
 	Delete()
 }
 
-// Scope is a sub-statter identified by a unique id.
+// Scope is a sub-statter identified by an ID unique across the statter tree.
 //
-// Metrics created through a Scope are tracked by it, and are removed together
-// when the Scope is deleted or replaced. See [Statter.Scope].
+// Newly registered metrics created through a Scope are tracked by it and
+// removed together when the Scope is deleted or replaced. A metric requested
+// through the Scope that was already registered elsewhere is not tracked.
+// Metrics first registered through the Scope share their registration with
+// later callers using the same name and tags, so deleting the Scope removes
+// those metrics for all callers. See [Statter.Scope].
 type Scope struct {
 	reg    *registry
 	id     string
@@ -68,13 +72,14 @@ func (sc *Scope) matches(parent *Statter, tags []Tag) bool {
 	return true
 }
 
-// FullName returns the full name with prefix for the given name.
+// FullName joins name to the Scope's prefix with the configured separator.
+// If the Scope has no prefix, it returns name unchanged.
 func (sc *Scope) FullName(name string) string {
 	return sc.s.FullName(name)
 }
 
-// Counter returns a counter for the given name and tags, tracking it against
-// the scope.
+// Counter returns a counter for the given name and tags. A newly registered
+// counter is tracked by the Scope and removed when the Scope is deleted.
 func (sc *Scope) Counter(name string, tags ...Tag) *Counter {
 	c, created := sc.s.counter(name, tags)
 	if created {
@@ -83,8 +88,8 @@ func (sc *Scope) Counter(name string, tags ...Tag) *Counter {
 	return c
 }
 
-// Gauge returns a gauge for the given name and tags, tracking it against the
-// scope.
+// Gauge returns a gauge for the given name and tags. A newly registered gauge
+// is tracked by the Scope and removed when the Scope is deleted.
 func (sc *Scope) Gauge(name string, tags ...Tag) *Gauge {
 	g, created := sc.s.gauge(name, tags)
 	if created {
@@ -93,8 +98,9 @@ func (sc *Scope) Gauge(name string, tags ...Tag) *Gauge {
 	return g
 }
 
-// Histogram returns a histogram for the given name and tags, tracking it
-// against the scope.
+// Histogram returns a histogram for the given name and tags. A newly
+// registered histogram is tracked by the Scope and removed when the Scope is
+// deleted.
 func (sc *Scope) Histogram(name string, tags ...Tag) *Histogram {
 	h, created := sc.s.histogram(name, tags)
 	if created {
@@ -103,8 +109,8 @@ func (sc *Scope) Histogram(name string, tags ...Tag) *Histogram {
 	return h
 }
 
-// Timing returns a timing for the given name and tags, tracking it against the
-// scope.
+// Timing returns a timing for the given name and tags. A newly registered
+// timing is tracked by the Scope and removed when the Scope is deleted.
 func (sc *Scope) Timing(name string, tags ...Tag) *Timing {
 	t, created := sc.s.timing(name, tags)
 	if created {

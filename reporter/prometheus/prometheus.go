@@ -1,4 +1,4 @@
-// Package prometheus implements a prometheus stats client.
+// Package prometheus exposes metrics through a Prometheus HTTP handler.
 package prometheus
 
 import (
@@ -15,17 +15,19 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-// Option represents a prometheus option function.
+// Option configures a Prometheus reporter created by New.
 type Option func(p *Prometheus)
 
-// WithBuckets sets the buckets to use with histograms.
+// WithBuckets sets the default bucket boundaries used by histograms and
+// timings unless a metric is registered with explicit buckets.
 func WithBuckets(buckets []float64) Option {
 	return func(p *Prometheus) {
 		p.defBuckets = buckets
 	}
 }
 
-// WithErrorLog sets the error log function for logging errors when registering metrics.
+// WithErrorLog sets the function used to report errors while registering
+// metrics. If fn is nil, the default error logger is retained.
 func WithErrorLog(fn func(string)) Option {
 	return func(p *Prometheus) {
 		if fn == nil {
@@ -35,7 +37,7 @@ func WithErrorLog(fn func(string)) Option {
 	}
 }
 
-// Prometheus is a prometheus stats collector.
+// Prometheus collects metrics for scraping in Prometheus format.
 type Prometheus struct {
 	namespace string
 
@@ -53,7 +55,7 @@ type Prometheus struct {
 	errLog func(string)
 }
 
-// New returns a new prometheus reporter.
+// New returns a Prometheus reporter with the given namespace and options.
 func New(namespace string, opts ...Option) *Prometheus {
 	fqn := newFQN()
 
@@ -72,7 +74,8 @@ func New(namespace string, opts ...Option) *Prometheus {
 	return p
 }
 
-// Handler returns the prometheus HTTP handler for scraping metrics.
+// Handler returns an HTTP handler that exposes the collected metrics for
+// Prometheus scraping.
 func (p *Prometheus) Handler() http.Handler {
 	return promhttp.HandlerFor(p.reg, promhttp.HandlerOpts{})
 }

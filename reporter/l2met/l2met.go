@@ -1,4 +1,5 @@
-// Package l2met implements a l2met stats client.
+// Package l2met reports counters and gauges as structured log fields using
+// hamba/logger.
 package l2met
 
 import (
@@ -7,7 +8,7 @@ import (
 	"github.com/hamba/statter/v2/internal/bytes"
 )
 
-// L2met is a l2met client.
+// L2met reports metrics to a logger.
 type L2met struct {
 	log    *logger.Logger
 	prefix string
@@ -15,7 +16,7 @@ type L2met struct {
 	pool bytes.Pool
 }
 
-// New returns a l2met reporter.
+// New returns an L2met reporter that prepends prefix to metric names.
 func New(log *logger.Logger, prefix string) *L2met {
 	if len(prefix) > 0 {
 		prefix += "."

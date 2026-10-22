@@ -1,4 +1,5 @@
-// Package victoriametrics implements a VictoriaMetrics stats reporter.
+// Package victoriametrics exposes metrics in Prometheus format through an
+// HTTP handler backed by VictoriaMetrics metrics.
 package victoriametrics
 
 import (
@@ -11,14 +12,14 @@ import (
 	"github.com/hamba/statter/v2/internal/bytes"
 )
 
-// VictoriaMetrics is a victoria metrics stats reporter.
+// VictoriaMetrics collects metrics for HTTP scraping.
 type VictoriaMetrics struct {
 	fqn *fqn
 
 	set *metrics.Set
 }
 
-// New returns a new victoria metrics reporter.
+// New returns an empty VictoriaMetrics reporter.
 func New() *VictoriaMetrics {
 	fqn := newFQN()
 

@@ -10,44 +10,59 @@ import (
 	"github.com/hamba/statter/v2/internal/stats"
 )
 
-// DiscardReporter is a reporter that discards all stats.
+// DiscardReporter discards all reported metrics.
 var DiscardReporter = discardReporter{}
 
-// Reporter represents a stats reporter.
-//
-// The statter passes tags sorted by key.
+// Reporter receives counter deltas and gauge values from a Statter.
+// The statter passes tags sorted by key. Counter values are increments since
+// the previous flush; gauge values are the latest value set.
 type Reporter interface {
+	// Counter adds a counter delta for the named metric and tags.
 	Counter(name string, v int64, tags [][2]string)
+
+	// Gauge sets the gauge value for the named metric and tags.
 	Gauge(name string, v float64, tags [][2]string)
 }
 
-// RemovableReporter represents a stats reporter that handles removal.
+// RemovableReporter allows a reporter to remove counters and gauges previously
+// reported to it.
 type RemovableReporter interface {
+	// RemoveCounter removes the counter identified by its name and tags.
 	RemoveCounter(name string, tags [][2]string)
+
+	// RemoveGauge removes the gauge identified by its name and tags.
 	RemoveGauge(name string, tags [][2]string)
 }
 
-// HistogramReporter represents a stats reporter that handles histograms.
+// HistogramReporter lets a reporter receive histogram observations directly.
 type HistogramReporter interface {
+	// Histogram returns a function that reports observations for the named
+	// histogram and tags.
 	Histogram(name string, tags [][2]string) func(v float64)
 }
 
-// RemovableHistogramReporter represents a stats reporter that handles histogram removal.
+// RemovableHistogramReporter allows a reporter to remove histograms previously
+// created through HistogramReporter.
 type RemovableHistogramReporter interface {
+	// RemoveHistogram removes the histogram identified by its name and tags.
 	RemoveHistogram(name string, tags [][2]string)
 }
 
-// TimingReporter represents a stats reporter that handles timings.
+// TimingReporter lets a reporter receive timing observations directly.
 type TimingReporter interface {
+	// Timing returns a function that reports durations for the named timing and
+	// tags.
 	Timing(name string, tags [][2]string) func(v time.Duration)
 }
 
-// RemovableTimingReporter represents a stats reporter that handles timing removal.
+// RemovableTimingReporter allows a reporter to remove timings previously
+// created through TimingReporter.
 type RemovableTimingReporter interface {
+	// RemoveTiming removes the timing identified by its name and tags.
 	RemoveTiming(name string, tags [][2]string)
 }
 
-// Tag is a stat tag.
+// Tag is a key/value pair attached to a metric.
 type Tag = [2]string
 
 type config struct {
@@ -66,56 +81,62 @@ func defaultConfig() config {
 	}
 }
 
-// Option represents a statter option function.
+// Option configures a Statter created by New.
 type Option func(*config)
 
-// WithPrefix sets the initial prefix on a statter.
+// WithPrefix sets the prefix applied to metric names recorded by the Statter.
 func WithPrefix(prefix string) Option {
 	return func(c *config) {
 		c.prefix = prefix
 	}
 }
 
-// WithTags sets the initial tags on a statter.
+// WithTags sets tags applied to metrics recorded by the Statter. A metric tag
+// with the same key overrides the configured value.
 func WithTags(tags ...Tag) Option {
 	return func(c *config) {
 		c.tags = tags
 	}
 }
 
-// WithSeparator sets the key separator on a statter.
+// WithSeparator sets the string used to join a prefix and metric name.
 func WithSeparator(sep string) Option {
 	return func(c *config) {
 		c.separator = sep
 	}
 }
 
-// WithPercentileSamples sets the number of samples taken to
-// calculate percentiles.
+// WithPercentileSamples sets the maximum number of observations retained to
+// estimate percentiles for locally aggregated histograms and timings. The
+// default is 1000; other aggregate statistics use all observations.
 func WithPercentileSamples(n int) Option {
 	return func(c *config) {
 		c.percSamples = n
 	}
 }
 
-// WithPercentiles sets the percentiles to calculate and report
-// for aggregated histograms and timings.
+// WithPercentiles sets the percentiles to report for locally aggregated
+// histograms and timings. Each value is a percentile from 0 through 100.
+// Percentiles are ignored when the reporter handles observations directly.
 func WithPercentiles(p []float64) Option {
 	return func(c *config) {
 		c.percentiles = p
 	}
 }
 
-// Statter collects and reports stats.
+// Statter records metrics and periodically reports them to a Reporter.
+// Create a Statter with New; its zero value is not ready to use.
 type Statter struct {
 	reg    *registry
 	prefix string
 	tags   []Tag
 }
 
-// New returns a Statter that aggregates stats and flushes them to r on every
-// interval tick. Options may be used to set an initial prefix, tags, key
-// separator, and percentile configuration.
+// New returns a Statter that reports metrics to r on each interval tick.
+// interval must be positive. Options configure the initial prefix and tags,
+// name separator, and percentile aggregation. Call Close on the returned root
+// Statter to stop reporting, flush pending metrics, and close r when it
+// implements io.Closer.
 func New(r Reporter, interval time.Duration, opts ...Option) *Statter {
 	cfg := defaultConfig()
 
@@ -184,7 +205,8 @@ func (s *Statter) Reporter() Reporter {
 	return s.reg.r
 }
 
-// FullName returns the full name with prefix for the given name.
+// FullName joins name to the Statter's prefix with the configured separator.
+// If the Statter has no prefix, it returns name unchanged.
 func (s *Statter) FullName(name string) string {
 	if s.prefix != "" {
 		return s.prefix + s.reg.cfg.separator + name
@@ -192,7 +214,7 @@ func (s *Statter) FullName(name string) string {
 	return name
 }
 
-// HasCounter determines if the counter exists.
+// HasCounter reports whether a counter with name and tags has been registered.
 func (s *Statter) HasCounter(name string, tags ...Tag) bool {
 	k := s.key(name, tags)
 
@@ -237,7 +259,7 @@ func (s *Statter) counter(name string, tags []Tag) (*Counter, bool) {
 	return c, created
 }
 
-// HasGauge determines if the gauge exists.
+// HasGauge reports whether a gauge with name and tags has been registered.
 func (s *Statter) HasGauge(name string, tags ...Tag) bool {
 	k := s.key(name, tags)
 
@@ -282,7 +304,8 @@ func (s *Statter) gauge(name string, tags []Tag) (*Gauge, bool) {
 	return g, created
 }
 
-// HasHistogram determines if the histogram exists.
+// HasHistogram reports whether a histogram with name and tags has been
+// registered.
 func (s *Statter) HasHistogram(name string, tags ...Tag) bool {
 	k := s.key(name, tags)
 
@@ -329,7 +352,7 @@ func (s *Statter) histogram(name string, tags []Tag) (*Histogram, bool) {
 	return h, created
 }
 
-// HasTiming determines if the timing exists.
+// HasTiming reports whether a timing with name and tags has been registered.
 func (s *Statter) HasTiming(name string, tags ...Tag) bool {
 	k := s.key(name, tags)
 
@@ -396,9 +419,9 @@ func (s *Statter) mergeDescriptors(name string, tags []Tag) (string, []Tag) {
 	return mergeDescriptors(s.prefix, s.reg.cfg.separator, name, s.tags, tags)
 }
 
-// Close stops the reporting loop, flushes any pending stats to the reporter,
-// and closes the reporter if it implements [io.Closer]. Close must be called
-// on the root statter; calling it on a sub-statter returns an error.
+// Close stops the reporting loop, flushes pending metrics, and closes the
+// reporter if it implements [io.Closer]. Call Close on the root Statter;
+// calling it on a sub-statter returns an error.
 func (s *Statter) Close() error {
 	if err := s.reg.Close(s); err != nil {
 		return err
@@ -413,8 +436,8 @@ func (s *Statter) Close() error {
 	return nil
 }
 
-// Counter implements a counter that monotonically accumulates a value between
-// flushes. The accumulated delta is reported and reset to zero on each flush.
+// Counter accumulates increments between flushes. Each flush reports the
+// accumulated delta and resets it to zero.
 type Counter struct {
 	name string
 	tags [][2]string
@@ -424,12 +447,13 @@ type Counter struct {
 	val atomic.Int64
 }
 
-// Inc increments the counter by v.
+// Inc adds v to the counter. The increment may be positive, zero, or negative.
 func (c *Counter) Inc(v int64) {
 	c.val.Add(v)
 }
 
-// Delete removes the counter.
+// Delete stops aggregating the counter and removes it from the reporter when
+// the reporter implements RemovableReporter.
 func (c *Counter) Delete() {
 	c.reg.reportMu.RLock()
 	defer c.reg.reportMu.RUnlock()
@@ -447,8 +471,7 @@ func (c *Counter) value() int64 {
 	return c.val.Swap(0)
 }
 
-// Gauge implements a gauge that holds its last-set value and reports it on
-// each flush.
+// Gauge holds its last-set value and reports it on each flush.
 type Gauge struct {
 	name string
 	tags [][2]string
@@ -458,22 +481,22 @@ type Gauge struct {
 	val atomic.Uint64
 }
 
-// Set sets the gauge value.
+// Set replaces the gauge value.
 func (g *Gauge) Set(v float64) {
 	g.val.Store(math.Float64bits(v))
 }
 
-// Inc increments the gauge by 1.
+// Inc increases the gauge by 1.
 func (g *Gauge) Inc() {
 	g.Add(1)
 }
 
-// Dec decrements the gauge by 1.
+// Dec decreases the gauge by 1.
 func (g *Gauge) Dec() {
 	g.Add(-1)
 }
 
-// Add increases the gauge's value by v.
+// Add adds v to the gauge's current value.
 func (g *Gauge) Add(v float64) {
 	for {
 		oldBits := g.val.Load()
@@ -484,12 +507,13 @@ func (g *Gauge) Add(v float64) {
 	}
 }
 
-// Sub subtracts the argument from the gauge's value.
+// Sub subtracts v from the gauge's current value.
 func (g *Gauge) Sub(v float64) {
 	g.Add(v * -1)
 }
 
-// Delete removes the gauge.
+// Delete stops reporting the gauge and removes it from the reporter when the
+// reporter implements RemovableReporter.
 func (g *Gauge) Delete() {
 	g.reg.reportMu.RLock()
 	defer g.reg.reportMu.RUnlock()
@@ -508,7 +532,7 @@ func (g *Gauge) value() float64 {
 	return math.Float64frombits(v)
 }
 
-// Histogram implements a histogram.
+// Histogram records observations for a metric.
 //
 // When the reporter implements [HistogramReporter], observations are delegated
 // to it directly. Otherwise observations are aggregated locally and reported
@@ -546,7 +570,7 @@ func newHistogram(hr HistogramReporter, name string, tags [][2]string, pool *sta
 	}
 }
 
-// Observe observes a histogram value.
+// Observe adds v to the histogram.
 func (h *Histogram) Observe(v float64) {
 	if h.hrFn != nil {
 		h.hrFn(v)
@@ -558,7 +582,8 @@ func (h *Histogram) Observe(v float64) {
 	h.mu.Unlock()
 }
 
-// Delete removes the histogram.
+// Delete stops recording the histogram and removes it from the reporter when
+// the reporter implements RemovableHistogramReporter or RemovableReporter.
 func (h *Histogram) Delete() {
 	h.reg.reportMu.RLock()
 	defer h.reg.reportMu.RUnlock()
@@ -586,7 +611,7 @@ func (h *Histogram) value() *stats.Sample {
 	return s
 }
 
-// Timing implements a timing.
+// Timing records duration observations for a metric.
 //
 // When the reporter implements [TimingReporter], observations are delegated to
 // it directly. Otherwise observations are aggregated locally in milliseconds
@@ -625,10 +650,8 @@ func newTiming(tr TimingReporter, name string, tags [][2]string, pool *stats.Poo
 	}
 }
 
-// Observe observes a timing duration.
-//
-// If the reporter does not handle timings, the duration
-// will be aggregated in milliseconds.
+// Observe adds d to the timing. When the reporter does not handle timings,
+// durations are aggregated and reported in milliseconds.
 func (t *Timing) Observe(d time.Duration) {
 	if t.trFn != nil {
 		t.trFn(d)
@@ -640,7 +663,8 @@ func (t *Timing) Observe(d time.Duration) {
 	t.mu.Unlock()
 }
 
-// Delete removes the timing.
+// Delete stops recording the timing and removes it from the reporter when the
+// reporter implements RemovableTimingReporter or RemovableReporter.
 func (t *Timing) Delete() {
 	t.reg.reportMu.RLock()
 	defer t.reg.reportMu.RUnlock()
